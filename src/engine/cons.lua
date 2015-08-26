@@ -1,0 +1,1 @@
+reserved_keywords = {"function", "while", "if", "for", "end"}
