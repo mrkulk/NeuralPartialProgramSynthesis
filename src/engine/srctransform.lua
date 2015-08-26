@@ -66,7 +66,6 @@ end
 
 
 local function parse(line)
-  printf("-------------------------------\n")
   skip = false
 
   for i=1,#reserved_keywords do 
@@ -76,7 +75,10 @@ local function parse(line)
   end
   if skip == false then
     if string.match(line, "return") ~= nil then
-      print('Not Implemented')
+      -- print('Not Implemented')
+      local variable = split(line, " ")
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(return" .. "," .. variable[#variable] .. ")\n"
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
     else
       local file = io.open("tmp.txt", "w")
       file:write(line)
@@ -110,4 +112,5 @@ end
 
 
 transformer("testprogram.lua")
+print('Completed program source transformation ...\n\n')
 print(MODIFIED_SOURCE)
