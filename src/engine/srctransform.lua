@@ -10,7 +10,7 @@ local function printf(str)
   end
 end
 
-MODIFIED_SOURCE = "require 'nn' \n"
+MODIFIED_SOURCE = "require 'engine' \n"
 
 local function neural_interpret(line, lvars, rvars)
   -- print(line)
@@ -51,7 +51,7 @@ local function neural_interpret(line, lvars, rvars)
   linfo_serialized = JSON:encode(linfo)
   rinfo_serialized = JSON:encode(rinfo)
   MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
-  MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(" .. linfo_serialized .. "," .. rinfo_serialized .. ")\n"
+  MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(\'" .. linfo_serialized .. "\',\'" .. rinfo_serialized .. "\')\n"
 end
 
 
@@ -77,13 +77,13 @@ local function parse(line)
     if string.match(line, "return") ~= nil then
       -- print('Not Implemented')
       local variable = split(line, " ")
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(return" .. "," .. variable[#variable] .. ")\n"
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(\'return\'" .. ",\'" .. variable[#variable] .. "\')\n"
       MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
     else
-      local file = io.open("tmp.txt", "w")
+      local file = io.open("tmp/tmp.txt", "w")
       file:write(line)
       file:close()
-      local ast = getAST("tmp.txt")
+      local ast = getAST("tmp/tmp.txt")
       ast = ast.body[1]
       local last = ast.left[1]; local rast = ast.right[1]
       lvars = {}; recurse(last, lvars)
@@ -114,3 +114,6 @@ end
 transformer("testprogram.lua")
 print('Completed program source transformation ...\n\n')
 print(MODIFIED_SOURCE)
+local file = io.open("tmp/modsrc.lua", "w")
+file:write(MODIFIED_SOURCE)
+file:close()

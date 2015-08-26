@@ -1,4 +1,4 @@
-function main(arg)
+function program(arg)
   a=torch.zeros(10)
   fac = 30
   mult = 5
