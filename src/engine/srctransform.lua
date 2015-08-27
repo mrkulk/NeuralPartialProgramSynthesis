@@ -19,10 +19,10 @@ local function neural_interpret(line, lvars, rvars)
   local linfo
   if lvars[1].kind == "Identifier" then
     -- linfo={"Identifier", lvars[1].name}
-    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. lvars[1].name .. '},'
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'Identifier'," .. "'" ..  lvars[1].name .. "'," .. lvars[1].name .. '},'
   elseif lvars[1].kind == "MemberExpression" then
     -- linfo={"MemberExpression", lvars[1].object.name, lvars[1].property.name}
-    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. lvars[1].object.name .. "," .. lvars[1].property.name .. '},'
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'MemberExpression'," .. "'" ..  lvars[1].object.name .. "'," .. lvars[1].object.name .. "," .. lvars[1].property.name .. '},'
   else
     print('[neural_interpret] ERROR: Not Implemented!')
     exit()
@@ -36,21 +36,21 @@ local function neural_interpret(line, lvars, rvars)
     local var = rvars[i]
     if var.kind == "CallExpression" then --array inits
       -- rinfo[i] = {"CallExpression", var.callee.property.name, var.arguments[1].value}
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.callee.property.name .. "," ..  var.arguments[1].value .. '},'
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. "," ..  var.arguments[1].value .. '},'
     elseif var.kind == "MemberExpression" then
       if var.property.kind == "Literal" then
         -- rinfo[i] = {"MemberExpression", var.object.name, var.property.value}
-        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.object.name .. "," ..  var.property.value .. '},'
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'Literal'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," ..  var.property.value .. '},'
       elseif var.property.kind == "Identifier" then
         -- rinfo[i] = {"MemberExpression", var.object.name, var.property.name}
-        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.object.name .. "," .. var.property.name .. '},'
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{'  .. "'Identifier'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," .. var.property.name .. '},'
       end
     elseif var.kind == "Literal" then
       -- rinfo[i] = {"Literal", var.value}
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.value .. '},'
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'Literal'," .. "'" ..  var.value .. "'," .. var.value .. '},'
     elseif var.kind == "Identifier" then
       -- rinfo[i] = {"Identifier", var.name}
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.name .. '},'
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' ..  "'Identifier'," .. "'" ..  var.name .. "'," .. var.name .. '},'
     end
     -- print(rinfo)
   end
