@@ -13,15 +13,16 @@ end
 MODIFIED_SOURCE = "require 'engine' \n"
 
 local function neural_interpret(line, lvars, rvars)
-  -- print(line)
-  -- print(lvars)
-  -- print(rvars)
+  MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
+
   ---- lhs -----
   local linfo
   if lvars[1].kind == "Identifier" then
-    linfo={"Identifier", lvars[1].name}
+    -- linfo={"Identifier", lvars[1].name}
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. lvars[1].name .. '},'
   elseif lvars[1].kind == "MemberExpression" then
-    linfo={"MemberExpression", lvars[1].object.name, lvars[1].property.name}
+    -- linfo={"MemberExpression", lvars[1].object.name, lvars[1].property.name}
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. lvars[1].object.name .. "," .. lvars[1].property.name .. '},'
   else
     print('[neural_interpret] ERROR: Not Implemented!')
     exit()
@@ -29,29 +30,32 @@ local function neural_interpret(line, lvars, rvars)
   -- print(linfo)
 
   ---- rhs ----
+  MODIFIED_SOURCE = MODIFIED_SOURCE .. "{"
   local rinfo  = {}
   for i=1,#rvars do
     local var = rvars[i]
     if var.kind == "CallExpression" then --array inits
-      rinfo[i] = {"CallExpression", var.callee.property.name, var.arguments[1].value}
+      -- rinfo[i] = {"CallExpression", var.callee.property.name, var.arguments[1].value}
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.callee.property.name .. "," ..  var.arguments[1].value .. '},'
     elseif var.kind == "MemberExpression" then
       if var.property.kind == "Literal" then
-        rinfo[i] = {"MemberExpression-Literal", var.object.name, var.property.value}
+        -- rinfo[i] = {"MemberExpression", var.object.name, var.property.value}
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.object.name .. "," ..  var.property.value .. '},'
       elseif var.property.kind == "Identifier" then
-        rinfo[i] = {"MemberExpression-Identifier", var.object.name, var.property.name}
+        -- rinfo[i] = {"MemberExpression", var.object.name, var.property.name}
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.object.name .. "," .. var.property.name .. '},'
       end
     elseif var.kind == "Literal" then
-      rinfo[i] = {"Literal", var.value}
+      -- rinfo[i] = {"Literal", var.value}
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.value .. '},'
     elseif var.kind == "Identifier" then
-      rinfo[i] = {"Identifier", var.name}
+      -- rinfo[i] = {"Identifier", var.name}
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. var.name .. '},'
     end
     -- print(rinfo)
   end
 
-  linfo_serialized = JSON:encode(linfo)
-  rinfo_serialized = JSON:encode(rinfo)
-  MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
-  MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(\'" .. linfo_serialized .. "\',\'" .. rinfo_serialized .. "\')\n"
+  MODIFIED_SOURCE = MODIFIED_SOURCE .. "})\n"
 end
 
 
@@ -86,8 +90,8 @@ local function parse(line)
       local ast = getAST("tmp/tmp.txt")
       ast = ast.body[1]
       local last = ast.left[1]; local rast = ast.right[1]
-      lvars = {}; recurse(last, lvars)
-      rvars = {}; recurse(rast, rvars)
+      local lvars = {}; recurse(last, lvars)
+      local rvars = {}; recurse(rast, rvars)
       neural_interpret(line, lvars, rvars)
     end
   else
@@ -96,7 +100,7 @@ local function parse(line)
 end
 
 
-local function transformer(filename)
+function transformer(filename)
   local file = io.open(filename, "r")
   io.input(file)
   local cnt=1
@@ -110,10 +114,17 @@ local function transformer(filename)
   end 
 end
 
+local function unittest()
+  transformer("testprogram.lua")
+  print('Completed program source transformation ...\n\n')
+  print(MODIFIED_SOURCE)
+  local file = io.open("tmp/modsrc.lua", "w")
+  file:write(MODIFIED_SOURCE)
+  file:close()
+  print('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+  
+  require('tmp/modsrc.lua')
+  program(torch.rand(10))
+end
 
-transformer("testprogram.lua")
-print('Completed program source transformation ...\n\n')
-print(MODIFIED_SOURCE)
-local file = io.open("tmp/modsrc.lua", "w")
-file:write(MODIFIED_SOURCE)
-file:close()
+unittest()
