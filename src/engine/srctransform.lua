@@ -22,7 +22,25 @@ local function neural_interpret(line, lvars, rvars)
     MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'Identifier'," .. "'" ..  lvars[1].name .. "'," .. lvars[1].name .. '},'
   elseif lvars[1].kind == "MemberExpression" then
     -- linfo={"MemberExpression", lvars[1].object.name, lvars[1].property.name}
-    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'MemberExpression'," .. "'" ..  lvars[1].object.name .. "'," .. lvars[1].object.name .. "," .. lvars[1].property.name .. '},'
+    local ind1 = lvars[1].property.keyvals[1][1]
+    local ind2 = lvars[1].property.keyvals[2][1]
+    local ind1_val, ind2_val
+
+    if ind1.kind == "Literal" and ind2.kind == "Identifier" then
+      ind1_val = ind1.value; ind2_val = ind2.name
+    elseif ind1.kind == "Literal" and ind2.kind == "Literal" then
+      ind1_val = ind1.value; ind2_val = ind2.value
+    elseif ind1.kind == "Identifier" and ind2.kind == "Identifier" then
+      ind1_val = ind1.name; ind2_val = ind2.name
+    elseif ind1.kind == "Identifier" and ind2.kind == "Literal" then
+      ind1_val = ind1.name; ind2_val = ind2.name
+    end
+
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'MemberExpression'," .. "'" ..  lvars[1].object.name .. "'," .. lvars[1].object.name .. "," .. 
+                                            ind1_val .. ',' ..
+                                            ind2_val .. ',' .. '},'
+    -- print(lvars[1])
+    -- print(MODIFIED_SOURCE)
   else
     print('[neural_interpret] ERROR: Not Implemented!')
     exit()
@@ -38,13 +56,25 @@ local function neural_interpret(line, lvars, rvars)
       -- rinfo[i] = {"CallExpression", var.callee.property.name, var.arguments[1].value}
       MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. "," ..  var.arguments[1].value .. '},'
     elseif var.kind == "MemberExpression" then
-      if var.property.kind == "Literal" then
-        -- rinfo[i] = {"MemberExpression", var.object.name, var.property.value}
-        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'Literal'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," ..  var.property.value .. '},'
-      elseif var.property.kind == "Identifier" then
-        -- rinfo[i] = {"MemberExpression", var.object.name, var.property.name}
-        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{'  .. "'Identifier'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," .. var.property.name .. '},'
+
+      local ind1 = var.property.keyvals[1][1]
+      local ind2 = var.property.keyvals[2][1]
+      local ind1_val, ind2_val
+
+      if ind1.kind == "Literal" and ind2.kind == "Identifier" then
+        ind1_val = ind1.value; ind2_val = ind2.name
+      elseif ind1.kind == "Literal" and ind2.kind == "Literal" then
+        ind1_val = ind1.value; ind2_val = ind2.value
+      elseif ind1.kind == "Identifier" and ind2.kind == "Identifier" then
+        ind1_val = ind1.name; ind2_val = ind2.name
+      elseif ind1.kind == "Identifier" and ind2.kind == "Literal" then
+        ind1_val = ind1.name; ind2_val = ind2.name
       end
+
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'MemberExpression'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," .. 
+                                              ind1_val .. ',' ..
+                                              ind2_val .. ',' .. '},'
+
     elseif var.kind == "Literal" then
       -- rinfo[i] = {"Literal", var.value}
       MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'Literal'," .. "'" ..  var.value .. "'," .. var.value .. '},'
@@ -123,8 +153,8 @@ local function unittest()
   file:close()
   print('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
   
-  require('tmp/modsrc.lua')
-  program(torch.rand(10))
+  -- require('tmp/modsrc.lua')
+  -- program(torch.rand(1,10))
 end
 
 unittest()
