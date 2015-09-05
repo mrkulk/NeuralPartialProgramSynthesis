@@ -8,10 +8,10 @@ MEMCNTR = 1
 
 
 function syncMemory(lexp, rexp)
-  print('##############')
-  print(lexp)
-  print(rexp) 
-  print('============')
+  -- print('##############')
+  -- print(lexp)
+  -- print(rexp) 
+
   local lhs_cmds, rhs_cmds
   rhs_cmds = {}
   reads = {}; writes={}
@@ -70,7 +70,7 @@ function syncMemory(lexp, rexp)
   local exp = rexp[1]
   if exp[1] == "CallExpression" or exp[1] == "Literal" then
     if #rexp == 1 then
-      return
+      return lhs_cmds, rhs_cmds
     end
   end
   for i=1,#rexp do
@@ -86,13 +86,14 @@ function syncMemory(lexp, rexp)
       -- print(rhs_cmds)
     end 
   end
-  -- print(lhs_cmds[1].rkey, lhs_cmds[1].ckey)
+  return lhs_cmds, rhs_cmds
 end
 
 function _nreg(lexp, rexp)
     if lexp == "return" then
         print('TODO: return')
     else
-      syncMemory(lexp, rexp)
+      lhs_cmds, rhs_cmds = syncMemory(lexp, rexp)
+      print(rhs_cmds)
     end
 end
