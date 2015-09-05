@@ -1,1 +1,1 @@
-    a[{1,indx}]  = arg[{1,indx}]*fac + mult*arg[{1,1}]
+    a[{{1,1},{indx,indx}}]  = arg[{{1,1},{indx,indx}}]*fac + arg[{{1,1},{1,1}}]*mult

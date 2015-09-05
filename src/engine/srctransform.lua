@@ -15,6 +15,7 @@ MODIFIED_SOURCE = "require 'engine' \n"
 local function neural_interpret(line, lvars, rvars)
   MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
 
+
   ---- lhs -----
   local linfo
   if lvars[1].kind == "Identifier" then
@@ -22,23 +23,24 @@ local function neural_interpret(line, lvars, rvars)
     MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'Identifier'," .. "'" ..  lvars[1].name .. "'," .. lvars[1].name .. '},'
   elseif lvars[1].kind == "MemberExpression" then
     -- linfo={"MemberExpression", lvars[1].object.name, lvars[1].property.name}
-    local ind1 = lvars[1].property.keyvals[1][1]
-    local ind2 = lvars[1].property.keyvals[2][1]
-    local ind1_val, ind2_val
+    local ind1_first = lvars[1].property.keyvals[1][1].keyvals[1][1]
+    local ind1_second = lvars[1].property.keyvals[1][1].keyvals[2][1]
+    
+    local ind2_first = lvars[1].property.keyvals[2][1].keyvals[1][1]
+    local ind2_second = lvars[1].property.keyvals[2][1].keyvals[2][1]
 
-    if ind1.kind == "Literal" and ind2.kind == "Identifier" then
-      ind1_val = ind1.value; ind2_val = ind2.name
-    elseif ind1.kind == "Literal" and ind2.kind == "Literal" then
-      ind1_val = ind1.value; ind2_val = ind2.value
-    elseif ind1.kind == "Identifier" and ind2.kind == "Identifier" then
-      ind1_val = ind1.name; ind2_val = ind2.name
-    elseif ind1.kind == "Identifier" and ind2.kind == "Literal" then
-      ind1_val = ind1.name; ind2_val = ind2.name
-    end
+    local ind1_first_val, ind1_second_val, ind2_first_val, ind2_second_val
+
+    if ind1_first.kind == "Literal" then ind1_first_val = ind1_first.value else ind1_first_val = ind1_first.name end
+    if ind1_second.kind == "Literal" then ind1_second_val = ind1_second.value else ind1_second_val = ind1_second.name end
+    if ind2_first.kind == "Literal" then ind2_first_val = ind2_first.value else ind2_first_val = ind2_first.name end
+    if ind2_second.kind == "Literal" then ind2_second_val = ind2_second.value else ind2_second_val = ind2_second.name end
 
     MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'MemberExpression'," .. "'" ..  lvars[1].object.name .. "'," .. lvars[1].object.name .. "," .. 
-                                            ind1_val .. ',' ..
-                                            ind2_val .. ',' .. '},'
+                                            ind1_first_val .. ',' ..
+                                            ind1_second_val .. ',' ..
+                                            ind2_first_val .. ',' ..
+                                            ind2_second_val .. ',' .. '},'
     -- print(lvars[1])
     -- print(MODIFIED_SOURCE)
   else
@@ -57,23 +59,25 @@ local function neural_interpret(line, lvars, rvars)
       MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. "," ..  var.arguments[1].value .. '},'
     elseif var.kind == "MemberExpression" then
 
-      local ind1 = var.property.keyvals[1][1]
-      local ind2 = var.property.keyvals[2][1]
-      local ind1_val, ind2_val
+      local ind1_first = var.property.keyvals[1][1].keyvals[1][1]
+      local ind1_second = var.property.keyvals[1][1].keyvals[2][1]
+      
+      local ind2_first = var.property.keyvals[2][1].keyvals[1][1]
+      local ind2_second = var.property.keyvals[2][1].keyvals[2][1]
 
-      if ind1.kind == "Literal" and ind2.kind == "Identifier" then
-        ind1_val = ind1.value; ind2_val = ind2.name
-      elseif ind1.kind == "Literal" and ind2.kind == "Literal" then
-        ind1_val = ind1.value; ind2_val = ind2.value
-      elseif ind1.kind == "Identifier" and ind2.kind == "Identifier" then
-        ind1_val = ind1.name; ind2_val = ind2.name
-      elseif ind1.kind == "Identifier" and ind2.kind == "Literal" then
-        ind1_val = ind1.name; ind2_val = ind2.name
-      end
+      local ind1_first_val, ind1_second_val, ind2_first_val, ind2_second_val
+
+      if ind1_first.kind == "Literal" then ind1_first_val = ind1_first.value else ind1_first_val = ind1_first.name end
+      if ind1_second.kind == "Literal" then ind1_second_val = ind1_second.value else ind1_second_val = ind1_second.name end
+      if ind2_first.kind == "Literal" then ind2_first_val = ind2_first.value else ind2_first_val = ind2_first.name end
+      if ind2_second.kind == "Literal" then ind2_second_val = ind2_second.value else ind2_second_val = ind2_second.name end
+
 
       MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'MemberExpression'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," .. 
-                                              ind1_val .. ',' ..
-                                              ind2_val .. ',' .. '},'
+                                            ind1_first_val .. ',' ..
+                                            ind1_second_val .. ',' ..
+                                            ind2_first_val .. ',' ..
+                                            ind2_second_val .. ',' .. '},'
 
     elseif var.kind == "Literal" then
       -- rinfo[i] = {"Literal", var.value}
@@ -153,8 +157,8 @@ local function unittest()
   file:close()
   print('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
   
-  -- require('tmp/modsrc.lua')
-  -- program(torch.rand(1,10))
+  require('tmp/modsrc.lua')
+  program(torch.rand(1,10))
 end
 
 unittest()
