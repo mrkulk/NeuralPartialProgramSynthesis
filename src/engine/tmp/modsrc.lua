@@ -1,5 +1,6 @@
 require 'engine' 
 function program(arg)
+_nload_data(arg)
   a=torch.zeros(1,10)
 _nreg({'Identifier','a',a},{{'CallExpression','zeros',zeros,1},})
   fac = 30

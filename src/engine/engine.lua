@@ -84,7 +84,9 @@ function syncMemory(lexp, rexp)
         ckey = VARLIST[exp[2]].ckey:clone()
       }
       -- print(rhs_cmds)
-    end 
+    elseif exp[1] == "MemberExpression" then
+      print(exp)
+    end
   end
   return lhs_cmds, rhs_cmds
 end
@@ -94,6 +96,33 @@ function _nreg(lexp, rexp)
         print('TODO: return')
     else
       lhs_cmds, rhs_cmds = syncMemory(lexp, rexp)
-      print(rhs_cmds)
+      -- print(rhs_cmds)
     end
+end
+
+function _nload_data(args)
+  local vrows = args:size()[1]
+  local start_col = 1; local end_col = cols
+  local INDX = MEMCNTR
+  local w_rkey = torch.zeros(rows)
+  local w_ckey = torch.zeros(cols)
+  w_rkey[{{INDX, INDX + vrows - 1}}] = 1
+  w_ckey[{{start_col,end_col}}] = 1
+
+  local memory = torch.zeros(rows, cols)
+
+  memory[{{INDX, INDX+ vrows - 1}, {start_col,end_col}}] = args
+  local cmd = {
+    [1] = {
+      cmd = "write",
+      rkey = w_rkey:clone(), --row key
+      ckey = w_ckey:clone(),  --col key
+      val = memory
+    }
+  }
+  local vname = "args"
+  if VARLIST[vname] == nil then
+    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR }
+  end
+  MEMCNTR = MEMCNTR + vrows
 end

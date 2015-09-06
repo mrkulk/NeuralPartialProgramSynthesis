@@ -108,6 +108,15 @@ local function parse(line)
 
   for i=1,#reserved_keywords do 
     if string.match(line, reserved_keywords[i]) ~= nil then
+      if reserved_keywords[i] == "program" then
+        local modline = line
+        modline = modline:gsub("function", "")
+        modline = modline:gsub("program", "")
+        modline = modline:gsub("%s+", "")        
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nload_data" .. modline .. "\n"
+        return
+      end
       skip = true
     end
   end

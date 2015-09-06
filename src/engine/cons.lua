@@ -1,1 +1,1 @@
-reserved_keywords = {"function", "while", "if", "for", "end"}
+reserved_keywords = {"program", "while", "if", "for", "end"}
