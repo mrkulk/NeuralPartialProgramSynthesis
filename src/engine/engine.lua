@@ -85,7 +85,24 @@ function syncMemory(lexp, rexp)
       }
       -- print(rhs_cmds)
     elseif exp[1] == "MemberExpression" then
-      print(exp)
+      local INDX = VARLIST[exp[2]].INDX
+      local w_rkey = torch.zeros(rows)
+      local w_ckey = torch.zeros(cols)
+      vrows = lexp[4]
+      if lexp[4] ~= lexp[5] then
+        print('ERROR: currently only supporting 1D along row')
+        exit()
+      end
+      start_col = lexp[6]; end_col = lexp[7]
+      w_rkey[{{INDX, INDX + vrows - 1}}] = 1
+      w_ckey[{{start_col,end_col}}] = 1
+      
+      rhs_cmds[#rhs_cmds+1] = {
+        cmd = "read",
+        rkey = w_rkey,
+        ckey = w_ckey
+      }
+
     end
   end
   return lhs_cmds, rhs_cmds
@@ -93,7 +110,12 @@ end
 
 function _nreg(lexp, rexp)
     if lexp == "return" then
-        print('TODO: return')
+      local cmd = {
+        cmd = "read",
+        rkey = VARLIST[rexp].rkey,
+        ckey = VARLIST[rexp].ckey,
+        ret = true
+      }
     else
       lhs_cmds, rhs_cmds = syncMemory(lexp, rexp)
       -- print(rhs_cmds)
@@ -120,6 +142,7 @@ function _nload_data(args)
       val = memory
     }
   }
+
   local vname = "args"
   if VARLIST[vname] == nil then
     VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR }
