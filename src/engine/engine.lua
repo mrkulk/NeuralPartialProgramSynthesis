@@ -7,7 +7,7 @@ MEMCNTR = 1
 
 
 
-function syncMemory(lexp, rexp)
+function syncMemory(BSIZE, lexp, rexp)
   -- print('##############')
   -- print(lexp)
   -- print(rexp) 
@@ -17,23 +17,25 @@ function syncMemory(lexp, rexp)
   reads = {}; writes={}
   -- process LHS -- 
   local vname, vind, val, vrows, start_col,end_col
+ 
   if lexp[1] == "Identifier" then
     vname = lexp[2]; val = lexp[3]
     if type(val) == type(1) then
       vrows = 1; start_col=1;end_col = cols
     else
       local sz = val:size()
-      vrows = sz[1]; start_col=1;end_col = sz[2]
+      vrows = sz[2]; start_col=1;end_col = sz[3]
     end
   elseif lexp[1] == "MemberExpression" then
     vname = lexp[2];
-    vrows = lexp[4]
-    if lexp[4] ~= lexp[5] then
+    vrows = lexp[5]
+    if lexp[5] ~= lexp[6] then
       print('ERROR: currently only supporting 1D along row')
       exit()
     end
-    start_col = lexp[6]; end_col = lexp[7]
-    val = lexp[3][{{vrows,vrows}, {start_col, end_col}}]
+    start_col = lexp[7]; end_col = lexp[8]
+    -- print(lexp[3])
+    val = lexp[3][{{},{vrows,vrows}, {start_col, end_col}}]
     -- vrows = lexp[4]; vcols = lexp[5]
     -- val = lexp[3][vrows][vcols]
   end
@@ -43,14 +45,16 @@ function syncMemory(lexp, rexp)
   end
 
   -- update writes for LHS
-  local w_rkey = torch.zeros(rows)
-  local w_ckey = torch.zeros(cols)
-  w_rkey[{{INDX, INDX + vrows - 1}}] = 1
-  w_ckey[{{start_col,end_col}}] = 1
+  local w_rkey = torch.zeros(BSIZE, rows)
+  local w_ckey = torch.zeros(BSIZE, cols)
+  w_rkey[{{},{INDX, INDX + vrows - 1}}] = 1
+  w_ckey[{{},{start_col,end_col}}] = 1
 
-  local memory = torch.zeros(rows, cols)
+  local memory = torch.zeros(BSIZE, rows, cols)
+  -- print(memory[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}])
+  -- print(val)
 
-  memory[{{INDX, INDX+ vrows - 1}, {start_col,end_col}}] = val
+  memory[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}] = val
   lhs_cmds = {
     [1] = {
       cmd = "write",
@@ -88,12 +92,12 @@ function syncMemory(lexp, rexp)
       local INDX = VARLIST[exp[2]].INDX
       local w_rkey = torch.zeros(rows)
       local w_ckey = torch.zeros(cols)
-      vrows = lexp[4]
-      if lexp[4] ~= lexp[5] then
+      vrows = lexp[5]
+      if lexp[5] ~= lexp[6] then
         print('ERROR: currently only supporting 1D along row')
         exit()
       end
-      start_col = lexp[6]; end_col = lexp[7]
+      start_col = lexp[7]; end_col = lexp[8]
       w_rkey[{{INDX, INDX + vrows - 1}}] = 1
       w_ckey[{{start_col,end_col}}] = 1
       
@@ -108,7 +112,7 @@ function syncMemory(lexp, rexp)
   return lhs_cmds, rhs_cmds
 end
 
-function _nreg(lexp, rexp)
+function _nreg(BSIZE,lexp, rexp)
     if lexp == "return" then
       local cmd = {
         cmd = "read",
@@ -117,12 +121,12 @@ function _nreg(lexp, rexp)
         ret = true
       }
     else
-      lhs_cmds, rhs_cmds = syncMemory(lexp, rexp)
+      lhs_cmds, rhs_cmds = syncMemory(BSIZE,lexp, rexp)
       -- print(rhs_cmds)
     end
 end
 
-function _nload_data(args)
+function _nload_data(BSIZE, args)
   local vrows = args:size()[1]
   local start_col = 1; local end_col = cols
   local INDX = MEMCNTR

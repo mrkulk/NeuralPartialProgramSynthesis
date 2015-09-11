@@ -20,14 +20,16 @@ local function neural_interpret(line, lvars, rvars)
   local linfo
   if lvars[1].kind == "Identifier" then
     -- linfo={"Identifier", lvars[1].name}
-    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'Identifier'," .. "'" ..  lvars[1].name .. "'," .. lvars[1].name .. '},'
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg(BSIZE, {' .. "'Identifier'," .. "'" ..  lvars[1].name .. "'," .. lvars[1].name .. '},'
   elseif lvars[1].kind == "MemberExpression" then
     -- linfo={"MemberExpression", lvars[1].object.name, lvars[1].property.name}
-    local ind1_first = lvars[1].property.keyvals[1][1].keyvals[1][1]
-    local ind1_second = lvars[1].property.keyvals[1][1].keyvals[2][1]
+    local ind_bz = lvars[1].property.keyvals[1][1].keyvals
+
+    local ind1_first = lvars[1].property.keyvals[2][1].keyvals[1][1]
+    local ind1_second = lvars[1].property.keyvals[2][1].keyvals[2][1]
     
-    local ind2_first = lvars[1].property.keyvals[2][1].keyvals[1][1]
-    local ind2_second = lvars[1].property.keyvals[2][1].keyvals[2][1]
+    local ind2_first = lvars[1].property.keyvals[3][1].keyvals[1][1]
+    local ind2_second = lvars[1].property.keyvals[3][1].keyvals[2][1]
 
     local ind1_first_val, ind1_second_val, ind2_first_val, ind2_second_val
 
@@ -36,7 +38,8 @@ local function neural_interpret(line, lvars, rvars)
     if ind2_first.kind == "Literal" then ind2_first_val = ind2_first.value else ind2_first_val = ind2_first.name end
     if ind2_second.kind == "Literal" then ind2_second_val = ind2_second.value else ind2_second_val = ind2_second.name end
 
-    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg({' .. "'MemberExpression'," .. "'" ..  lvars[1].object.name .. "'," .. lvars[1].object.name .. "," .. 
+    MODIFIED_SOURCE = MODIFIED_SOURCE .. '_nreg(BSIZE, {' .. "'MemberExpression'," .. "'" ..  lvars[1].object.name .. "'," .. lvars[1].object.name .. "," .. 
+                                            '{}' .. ',' .. 
                                             ind1_first_val .. ',' ..
                                             ind1_second_val .. ',' ..
                                             ind2_first_val .. ',' ..
@@ -56,14 +59,15 @@ local function neural_interpret(line, lvars, rvars)
     local var = rvars[i]
     if var.kind == "CallExpression" then --array inits
       -- rinfo[i] = {"CallExpression", var.callee.property.name, var.arguments[1].value}
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. "," ..  var.arguments[1].value .. '},'
+      
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. '},'
     elseif var.kind == "MemberExpression" then
 
-      local ind1_first = var.property.keyvals[1][1].keyvals[1][1]
-      local ind1_second = var.property.keyvals[1][1].keyvals[2][1]
+      local ind1_first = var.property.keyvals[2][1].keyvals[1][1]
+      local ind1_second = var.property.keyvals[2][1].keyvals[2][1]
       
-      local ind2_first = var.property.keyvals[2][1].keyvals[1][1]
-      local ind2_second = var.property.keyvals[2][1].keyvals[2][1]
+      local ind2_first = var.property.keyvals[3][1].keyvals[1][1]
+      local ind2_second = var.property.keyvals[3][1].keyvals[2][1]
 
       local ind1_first_val, ind1_second_val, ind2_first_val, ind2_second_val
 
@@ -74,6 +78,7 @@ local function neural_interpret(line, lvars, rvars)
 
 
       MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'MemberExpression'," .. "'" ..  var.object.name .. "'," .. var.object.name .. "," .. 
+                                            '{},' ..
                                             ind1_first_val .. ',' ..
                                             ind1_second_val .. ',' ..
                                             ind2_first_val .. ',' ..
@@ -124,7 +129,7 @@ local function parse(line)
     if string.match(line, "return") ~= nil then
       -- print('Not Implemented')
       local variable = split(line, " ")
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(\'return\'" .. ",\'" .. variable[#variable] .. "\')\n"
+      MODIFIED_SOURCE = MODIFIED_SOURCE .. "_nreg(BSIZE, \'return\'" .. ",\'" .. variable[#variable] .. "\')\n"
       MODIFIED_SOURCE = MODIFIED_SOURCE .. line .. "\n"
     else
       local file = io.open("tmp/tmp.txt", "w")
@@ -167,7 +172,8 @@ local function unittest()
   print('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
   
   require('tmp/modsrc.lua')
-  program(torch.rand(1,10))
+  local BSIZE = 2
+  program(BSIZE, torch.rand(BSIZE,1,10))
 end
 
 unittest()
