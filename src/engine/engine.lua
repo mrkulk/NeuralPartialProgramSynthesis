@@ -123,8 +123,8 @@ function _nreg(BSIZE, lexp, rexp, mode)
       }
     else
       lhs_cmds, rhs_cmds = syncMemory(BSIZE, lexp, rexp, mode)
-      -- print(lhs_cmds)
-      -- print(rhs_cmds)
+      print(rhs_cmds)
+      exit()
       if mode == "external" then 
         return 1
       end
