@@ -59,8 +59,11 @@ local function neural_interpret(line, lvars, rvars)
     local var = rvars[i]
     if var.kind == "CallExpression" then --array inits
       -- rinfo[i] = {"CallExpression", var.callee.property.name, var.arguments[1].value}
-      
-      MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. '},'
+      if var.callee.name == "_nreg_external" then
+        
+      else
+        MODIFIED_SOURCE = MODIFIED_SOURCE .. '{' .. "'CallExpression'," .. "'" ..  var.callee.property.name .. "'," .. var.callee.property.name .. '},'
+      end
     elseif var.kind == "MemberExpression" then
 
       local ind1_first = var.property.keyvals[2][1].keyvals[1][1]

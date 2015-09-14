@@ -1,1 +1,1 @@
-    a[{{},{1,1},{indx,indx}}]  = args[{{},{1,1},{indx,indx}}]*fac + args[{{},{1,1},{1,1}}]*mult
+  dummy = fac * 4

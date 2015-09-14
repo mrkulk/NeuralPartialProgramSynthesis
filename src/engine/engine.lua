@@ -7,7 +7,7 @@ MEMCNTR = 1
 
 
 
-function syncMemory(BSIZE, lexp, rexp)
+function syncMemory(BSIZE, lexp, rexp, mode)
   -- print('##############')
   -- print(lexp)
   -- print(rexp) 
@@ -60,7 +60,8 @@ function syncMemory(BSIZE, lexp, rexp)
       cmd = "write",
       rkey = w_rkey:clone(), --row key
       ckey = w_ckey:clone(),  --col key
-      val = memory
+      val = memory, 
+      mode = mode
     }
   }
 
@@ -90,16 +91,16 @@ function syncMemory(BSIZE, lexp, rexp)
       -- print(rhs_cmds)
     elseif exp[1] == "MemberExpression" then
       local INDX = VARLIST[exp[2]].INDX
-      local w_rkey = torch.zeros(rows)
-      local w_ckey = torch.zeros(cols)
+      local w_rkey = torch.zeros(BSIZE, rows)
+      local w_ckey = torch.zeros(BSIZE, cols)
       vrows = lexp[5]
       if lexp[5] ~= lexp[6] then
         print('ERROR: currently only supporting 1D along row')
         exit()
       end
       start_col = lexp[7]; end_col = lexp[8]
-      w_rkey[{{INDX, INDX + vrows - 1}}] = 1
-      w_ckey[{{start_col,end_col}}] = 1
+      w_rkey[{{},{INDX, INDX + vrows - 1}}] = 1
+      w_ckey[{{},{start_col,end_col}}] = 1
       
       rhs_cmds[#rhs_cmds+1] = {
         cmd = "read",
@@ -112,7 +113,7 @@ function syncMemory(BSIZE, lexp, rexp)
   return lhs_cmds, rhs_cmds
 end
 
-function _nreg(BSIZE,lexp, rexp)
+function _nreg(BSIZE, lexp, rexp, mode)
     if lexp == "return" then
       local cmd = {
         cmd = "read",
@@ -121,23 +122,30 @@ function _nreg(BSIZE,lexp, rexp)
         ret = true
       }
     else
-      lhs_cmds, rhs_cmds = syncMemory(BSIZE,lexp, rexp)
+      lhs_cmds, rhs_cmds = syncMemory(BSIZE, lexp, rexp, mode)
+      -- print(lhs_cmds)
       -- print(rhs_cmds)
+      if mode == "external" then 
+        return 1
+      end
     end
 end
 
+function _nreg_external(BSIZE, lhs, rhs)
+  return _nreg(BSIZE, lhs, rhs, "external")
+end
+
 function _nload_data(BSIZE, args)
-  local vrows = args:size()[1]
+  local vrows = args:size()[2]
   local start_col = 1; local end_col = cols
   local INDX = MEMCNTR
-  local w_rkey = torch.zeros(rows)
-  local w_ckey = torch.zeros(cols)
-  w_rkey[{{INDX, INDX + vrows - 1}}] = 1
-  w_ckey[{{start_col,end_col}}] = 1
+  local w_rkey = torch.zeros(BSIZE, rows)
+  local w_ckey = torch.zeros(BSIZE, cols)
+  w_rkey[{{}, {INDX, INDX + vrows - 1}}] = 1
+  w_ckey[{{}, {start_col,end_col}}] = 1
 
-  local memory = torch.zeros(rows, cols)
-
-  memory[{{INDX, INDX+ vrows - 1}, {start_col,end_col}}] = args
+  local memory = torch.zeros(BSIZE, rows, cols)
+  memory[{{},{INDX, INDX+ vrows - 1}, {start_col,end_col}}] = args
   local cmd = {
     [1] = {
       cmd = "write",
