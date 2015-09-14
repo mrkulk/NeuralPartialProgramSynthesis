@@ -49,6 +49,9 @@ function syncMemory(BSIZE, lexp, rexp, mode)
   local w_ckey = torch.zeros(BSIZE, cols)
   w_rkey[{{},{INDX, INDX + vrows - 1}}] = 1
   w_ckey[{{},{start_col,end_col}}] = 1
+  
+  local tkey = torch.zeros(BSIZE, rows, cols)
+  tkey[{{},{INDX, INDX + vrows - 1}, {start_col,end_col}}] = 1
 
   local memory = torch.zeros(BSIZE, rows, cols)
   -- print(memory[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}])
@@ -60,13 +63,14 @@ function syncMemory(BSIZE, lexp, rexp, mode)
       cmd = "write",
       rkey = w_rkey:clone(), --row key
       ckey = w_ckey:clone(),  --col key
+      key = tkey,
       val = memory, 
       mode = mode
     }
   }
 
   if VARLIST[vname] == nil then
-    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR }
+    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR, key = tkey }
   end
 
   MEMCNTR = MEMCNTR + vrows
@@ -86,7 +90,8 @@ function syncMemory(BSIZE, lexp, rexp, mode)
       rhs_cmds[#rhs_cmds + 1] = {
         cmd = "read",
         rkey = VARLIST[exp[2]].rkey:clone(),
-        ckey = VARLIST[exp[2]].ckey:clone()
+        ckey = VARLIST[exp[2]].ckey:clone(),
+        key = VARLIST[exp[2]].key:clone()
       }
       -- print(rhs_cmds)
     elseif exp[1] == "MemberExpression" then
@@ -102,10 +107,13 @@ function syncMemory(BSIZE, lexp, rexp, mode)
       w_rkey[{{},{INDX, INDX + vrows - 1}}] = 1
       w_ckey[{{},{start_col,end_col}}] = 1
       
+      local tkey = torch.zeros(BSIZE, rows, cols)
+      tkey[{{},{INDX, INDX + vrows - 1},{start_col,end_col}}] = 1
       rhs_cmds[#rhs_cmds+1] = {
         cmd = "read",
         rkey = w_rkey,
-        ckey = w_ckey
+        ckey = w_ckey,
+        key = tkey
       }
 
     end
@@ -115,16 +123,19 @@ end
 
 function _nreg(BSIZE, lexp, rexp, mode)
     if lexp == "return" then
+      local key = torch.zeros(BSIZE, rows, cols)
       local cmd = {
         cmd = "read",
-        rkey = VARLIST[rexp].rkey,
-        ckey = VARLIST[rexp].ckey,
+        rkey = VARLIST[rexp].rkey:clone(),
+        ckey = VARLIST[rexp].ckey:clone(),
+        key = VARLIST[rexp].key:clone(), 
         ret = true
       }
     else
       lhs_cmds, rhs_cmds = syncMemory(BSIZE, lexp, rexp, mode)
-      print(rhs_cmds)
-      exit()
+      -- print(rhs_cmds)
+      -- print(rhs_cmds)
+      -- exit()
       if mode == "external" then 
         return 1
       end
@@ -143,6 +154,9 @@ function _nload_data(BSIZE, args)
   local w_ckey = torch.zeros(BSIZE, cols)
   w_rkey[{{}, {INDX, INDX + vrows - 1}}] = 1
   w_ckey[{{}, {start_col,end_col}}] = 1
+  
+  local tkey = torch.zeros(BSIZE, rows, cols)
+  tkey[{{}, {INDX, INDX + vrows - 1}, {start_col,end_col}}] = 1
 
   local memory = torch.zeros(BSIZE, rows, cols)
   memory[{{},{INDX, INDX+ vrows - 1}, {start_col,end_col}}] = args
@@ -151,13 +165,14 @@ function _nload_data(BSIZE, args)
       cmd = "write",
       rkey = w_rkey:clone(), --row key
       ckey = w_ckey:clone(),  --col key
+      key = tkey,
       val = memory
     }
   }
 
   local vname = "args"
   if VARLIST[vname] == nil then
-    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR }
+    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR, key = tkey }
   end
   MEMCNTR = MEMCNTR + vrows
 end
