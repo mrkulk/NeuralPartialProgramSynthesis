@@ -1,20 +1,29 @@
-require 'srctransform.lua'
 
-local function transform_code()
-  transformer("testprogram.lua")
-  print('Completed program source transformation ...\n\n')
-  -- print(MODIFIED_SOURCE)
-  local file = io.open("tmp/modsrc.lua", "w")
-  file:write(MODIFIED_SOURCE)
-  file:close()
+local function run_valid()
+  reset_state(state_valid)
+  g_disable_dropout(model.rnns)
+  local len = (state_valid.data:size(1) - 1) / (params.seq_length)
+  local perp = 0
+  for i = 1, len do
+    perp = perp + fp(state_valid)
+  end
+  print("Validation set perplexity : " .. g_f3(torch.exp(perp / len)))
+  g_enable_dropout(model.rnns)
 end
 
-function main()
-	transform_code()
-  	require('tmp/modsrc.lua')
-  	
-  	local BSIZE = 1
-  	program(BSIZE, torch.rand(1,10))
+local function run_test()
+  reset_state(state_test)
+  g_disable_dropout(model.rnns)
+  local perp = 0
+  local len = state_test.data:size(1)
+  g_replace_table(model.s[0], model.start_s)
+  for i = 1, (len - 1) do
+    local x = state_test.data[i]
+    local y = state_test.data[i + 1]
+    perp_tmp, model.s[1] = unpack(model.rnns[1]:forward({x, y, model.s[0]}))
+    perp = perp + perp_tmp[1]
+    g_replace_table(model.s[0], model.s[1])
+  end
+  print("Test set perplexity : " .. g_f3(torch.exp(perp / (len - 1))))
+  g_enable_dropout(model.rnns)
 end
-
-main()

@@ -121,6 +121,17 @@ function syncMemory(BSIZE, lexp, rexp, mode)
   return lhs_cmds, rhs_cmds
 end
 
+
+function _nreg_forward(cmds)
+  local ret = 0
+  for i=1,#cmds do
+    local cmd = cmds[i]
+    print(cmd)
+  end
+  return ret
+end
+
+
 function _nreg(BSIZE, lexp, rexp, mode)
     if lexp == "return" then
       local key = torch.zeros(BSIZE, rows, cols)
@@ -128,16 +139,20 @@ function _nreg(BSIZE, lexp, rexp, mode)
         cmd = "read",
         rkey = VARLIST[rexp].rkey:clone(),
         ckey = VARLIST[rexp].ckey:clone(),
-        key = VARLIST[rexp].key:clone(), 
+        key = VARLIST[rexp].key:clone(),
         ret = true
       }
+      _nreg_forward(cmd)
     else
       lhs_cmds, rhs_cmds = syncMemory(BSIZE, lexp, rexp, mode)
       -- print(rhs_cmds)
       -- print(rhs_cmds)
       -- exit()
+      _nreg_forward(rhs_cmds)
+      local ret = _nreg_forward(lhs_cmds)
       if mode == "external" then 
-        return 1
+        print('TODO external')
+        return ret
       end
     end
 end
