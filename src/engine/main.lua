@@ -3,6 +3,7 @@
 require('cunn')
 require('nngraph')
 require('base')
+require('srctransform')
 
 -- Trains 1h and gives test 115 perplexity.
 params = {batch_size=20,
