@@ -1,4 +1,5 @@
 require 'Normalize'
+require 'componentMul'
 
 function transfer_data(x)
   return x:cuda()
@@ -53,65 +54,63 @@ function create_network()
   local reshape_prev_write_val   = nn.Reshape(params.batch_size, head_dim)(prev_write_val)
 
   local concat_x = nn.JoinTable(2)({reshape_prev_read_key, reshape_prev_read_val, reshape_prev_write_key , reshape_prev_write_val })
-
-
   local remapped_x = nn.Linear(4*head_dim, params.rnn_size)(concat_x)
 
+  local i                = {[0] = nn.Identity()(remapped_x)}
+
+  local next_s           = {}
+  local split         = {prev_s:split(2 * params.layers)}
+  for layer_idx = 1, params.layers do
+    local prev_c         = split[2 * layer_idx - 1]
+    local prev_h         = split[2 * layer_idx]
+    local dropped        = nn.Dropout(params.dropout)(i[layer_idx - 1])
+    local next_c, next_h = lstm(dropped, prev_c, prev_h)
+    table.insert(next_s, next_c)
+    table.insert(next_s, next_h)
+    i[layer_idx] = next_h
+  end
+
+  local h2y              = nn.Linear(params.rnn_size, params.input_dim)
+  local dropped          = nn.Dropout(params.dropout)(i[params.layers])
+  local pred             = nn.LogSoftMax()(h2y(dropped))
+
+  ---------------------- Memory Ops ------------------
+  local read_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
+  local read_key = nn.Reshape(params.rows,params.cols)(nn.Normalize()(nn.SoftMax()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel))))
+  local read_val = nn.componentMul()({MEM, read_key})
+
+  local write_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
+  local write_key = nn.Reshape(params.rows,params.cols)(nn.Normalize()(nn.SoftMax()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel))))
+  local write_val = nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)) 
+  local write_erase = nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)) 
+
+  local erase_val_interim = nn.componentMul()({write_key, write_erase})
+  local erase_val = nn.AddConstant(1)(nn.MulConstant(-1)(erase_val_interim))
+  local erase_MEM = nn.componentMul()({MEM, erase_val})
+
+  local add_val_interim = nn.componentMul()({write_key, write_val})
+  local add_MEM = nn.CAddTable()({erase_MEM, add_val_interim})
+
+  local err_rk = nn.MSECriterion()({read_key, nn.Reshape(params.rows * params.cols)(true_read_key)})
+  local err_rv = nn.MSECriterion()({read_val, nn.Reshape(params.rows * params.cols)(true_read_val)})
+  local err_wk = nn.MSECriterion()({write_key, nn.Reshape(params.rows * params.cols)(true_write_key)})
+  local err_wv = nn.MSECriterion()({write_val, nn.Reshape(params.rows * params.cols)(true_write_val)})
+  local err_we = nn.MSECriterion()({write_erase, nn.Reshape(params.rows * params.cols)(true_write_erase)})
 
   local module           = nn.gModule({prev_s, MEM, prev_read_key, prev_read_val, prev_write_key, prev_write_val,
                                                     true_read_key, true_read_val, true_write_key, true_write_val, true_write_erase},
-                                      {remapped_x, reshape_prev_read_key, 
-                                      prev_s, prev_read_key, prev_read_val, prev_write_key, prev_write_val, 
-                                      true_read_key, true_read_val, true_write_key, true_write_val, true_write_erase, MEM })
+                                      {err_rk, err_rv, err_wk, err_wv, err_we,
+                                      nn.Identity()(next_s), add_MEM, read_key, read_val, write_key, write_val, write_erase})
+  
   return module
-
-  -- local i                = {[0] = nn.Identity()(remapped_x)}
-
-  -- local next_s           = {}
-  -- local split         = {prev_s:split(2 * params.layers)}
-  -- for layer_idx = 1, params.layers do
-  --   local prev_c         = split[2 * layer_idx - 1]
-  --   local prev_h         = split[2 * layer_idx]
-  --   local dropped        = nn.Dropout(params.dropout)(i[layer_idx - 1])
-  --   local next_c, next_h = lstm(dropped, prev_c, prev_h)
-  --   table.insert(next_s, next_c)
-  --   table.insert(next_s, next_h)
-  --   i[layer_idx] = next_h
-  -- end
-
-  -- local h2y              = nn.Linear(params.rnn_size, params.input_dim)
-  -- local dropped          = nn.Dropout(params.dropout)(i[params.layers])
-  -- local pred             = nn.LogSoftMax()(h2y(dropped))
-
-  -- ---------------------- Memory Ops ------------------
-  -- local read_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
-  -- local read_key = nn.Normalize()(nn.SoftMax()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel)))
-  -- local read_val = nn.DotProduct()({MEM, read_key})
-
-  -- local write_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
-  -- local write_key = nn.Normalize()(nn.SoftMax()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)))
-  -- local write_val = nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel) 
-  -- local write_erase = nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel) 
-
-  -- local erase_val_interim = nn.DotProduct()({write_key, write_erase})
-  -- local erase_val = nn.AddConstant(1)(nn.MulConstant(-1)(erase_val_interim))
-  -- local erase_MEM = nn.DotProduct()({MEM, erase_val})
-
-  -- local add_val_interim = nn.DotProduct()({write_key, write_val})
-  -- local add_MEM = nn.CAddTable()({erase_MEM, add_val_interim})
-
-  -- local err_rk = nn.MSECriterion()({read_key, true_read_key})
-  -- local err_rv = nn.MSECriterion()({read_val, true_read_val})
-  -- local err_wk = nn.MSECriterion()({write_key, true_write_key})
-  -- local err_wv = nn.MSECriterion()({write_val, true_write_val})
-  -- local err_we = nn.MSECriterion()({write_erase, true_write_erase})
 
   -- local module           = nn.gModule({prev_s, MEM, prev_read_key, prev_read_val, prev_write_key, prev_write_val,
   --                                                   true_read_key, true_read_val, true_write_key, true_write_val, true_write_erase},
-  --                                     {err_rk, err_rv, err_wk, err_wv, err_we,
-  --                                     nn.Identity()(next_s), add_MEM, read_key, read_val, write_key, write_val, write_erase})
-  
+  --                                     { err_rk,
+  --                                     prev_s, prev_read_key, prev_read_val, prev_write_key, prev_write_val, 
+  --                                     true_read_key, true_read_val, true_write_key, true_write_val, true_write_erase, MEM })
   -- return module
+
 end
 
 
