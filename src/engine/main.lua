@@ -17,7 +17,10 @@ params = {batch_size=20,
                 input_dim=100,
                 max_epoch=4,
                 max_max_epoch=13,
-                max_grad_norm=5}
+                max_grad_norm=5,
+                rows = 20, -- mem
+                cols = 20 -- mem
+                }
 
 require('model')
 require('runner')
@@ -86,12 +89,34 @@ end
 
 -- main()
 
-core_network = create_network()
-print(params)
-print(
-  core_network:forward({
-    torch.zeros(params.batch_size, params.rnn_size):cuda(),
-    torch.zeros(params.batch_size):cuda(),
-    {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() }
-  })
-)
+local function local_coretest()
+  core_network = create_network()
+  core_network:cuda()
+  -- print(
+  --   core_network:forward({
+  --     torch.zeros(params.batch_size, params.rnn_size):cuda(),
+  --     torch.zeros(params.batch_size):cuda(),
+  --     {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
+  --     torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+  --   })
+  -- )  
+  print(params)
+  local ret = core_network:forward({
+    {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda()
+    })
+  print(ret)
+end
+local_coretest()
+
+-- model = setup()
+-- print(model)

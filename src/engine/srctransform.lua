@@ -179,4 +179,4 @@ local function unittest()
   program(BSIZE, torch.rand(BSIZE,1,10))
 end
 
-unittest()
+-- unittest()
