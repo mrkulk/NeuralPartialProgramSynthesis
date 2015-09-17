@@ -21,10 +21,10 @@ function Normalize:updateGradInput(input, gradOutput)
   local size = input:size(1)
   self.gradInput:resizeAs(input)
   for i = 1, size do
-    local output = torch.Tensor(size):copy(self.output)
+    local output = torch.Tensor(input:size()[2]):copy(self.output[i]):cuda()
     output:div(-self.sum)
     output[i] = output[i] + (1 / self.sum)
-    self.gradInput[i] = gradOutput:dot(output)
+    self.gradInput[i] = gradOutput[i]:dot(output)
   end
   return self.gradInput
 end

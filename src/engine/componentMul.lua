@@ -10,8 +10,7 @@ function componentMul:updateOutput(input)
 end
 
 function componentMul:updateGradInput(input, gradOutput)
-   self.gradInput = self.gradInput or input.new()
-   self.gradInput:zero()
+   self.gradInput = {torch.Tensor(input[1]:size()):zero(), torch.Tensor(input[1]:size()):zero()} 
    self.gradInput[1] = torch.cmul(input[2], gradOutput)
    self.gradInput[2] = torch.cmul(input[1], gradOutput)
    return self.gradInput

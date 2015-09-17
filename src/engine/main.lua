@@ -115,6 +115,33 @@ local function local_coretest()
     torch.rand(params.batch_size, params.rows, params.cols):cuda()
     })
   print(ret)
+
+  core_network:backward(
+  {
+    {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda()
+  },
+  {
+    torch.zeros(1):cuda(),torch.zeros(1):cuda(),torch.zeros(1):cuda(),torch.zeros(1):cuda(),torch.zeros(1):cuda(),
+    {torch.zeros(params.batch_size, params.rnn_size):cuda(),torch.zeros(params.batch_size, params.rnn_size):cuda(),
+    torch.zeros(params.batch_size, params.rnn_size):cuda(),torch.zeros(params.batch_size, params.rnn_size):cuda()
+    },
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+  })
 end
 local_coretest()
 
