@@ -52,18 +52,18 @@ function create_network()
   local reshape_prev_write_key   = nn.Reshape(params.batch_size, head_dim)(prev_write_key)
   local reshape_prev_write_val   = nn.Reshape(params.batch_size, head_dim)(prev_write_val)
 
-  local concat_x = nn.JoinTable(1)({reshape_prev_read_key, reshape_prev_read_val, reshape_prev_write_key , reshape_prev_write_val })
+  local concat_x = nn.JoinTable(2)({reshape_prev_read_key, reshape_prev_read_val, reshape_prev_write_key , reshape_prev_write_val })
+
+
+  local remapped_x = nn.Linear(4*head_dim, params.rnn_size)(concat_x)
 
 
   local module           = nn.gModule({prev_s, MEM, prev_read_key, prev_read_val, prev_write_key, prev_write_val,
                                                     true_read_key, true_read_val, true_write_key, true_write_val, true_write_erase},
-                                      { reshape_prev_read_key, 
+                                      {remapped_x, reshape_prev_read_key, 
                                       prev_s, prev_read_key, prev_read_val, prev_write_key, prev_write_val, 
                                       true_read_key, true_read_val, true_write_key, true_write_val, true_write_erase, MEM })
-  
   return module
-
-  -- local remapped_x = nn.Linear(4*head_dim, params.rnn_size)(concat_x)
 
   -- local i                = {[0] = nn.Identity()(remapped_x)}
 
@@ -79,9 +79,9 @@ function create_network()
   --   i[layer_idx] = next_h
   -- end
 
-  -- -- local h2y              = nn.Linear(params.rnn_size, params.input_dim)
-  -- -- local dropped          = nn.Dropout(params.dropout)(i[params.layers])
-  -- -- local pred             = nn.LogSoftMax()(h2y(dropped))
+  -- local h2y              = nn.Linear(params.rnn_size, params.input_dim)
+  -- local dropped          = nn.Dropout(params.dropout)(i[params.layers])
+  -- local pred             = nn.LogSoftMax()(h2y(dropped))
 
   -- ---------------------- Memory Ops ------------------
   -- local read_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
