@@ -143,8 +143,7 @@ function setup()
   return model
 end
 
-function reset_state(state)
-  state.pos = 1
+function reset_state()
   if model ~= nil and model.start_s ~= nil then
     for d = 1, 2 * params.layers do
       model.start_s[d]:zero()
@@ -160,15 +159,13 @@ end
 
 function fp(state)
   g_replace_table(model.s[0], model.start_s)
-  if state.pos + params.seq_length > state.data:size(1) then
-    reset_state(state)
-  end
+  reset_state()
+
   for i = 1, params.seq_length do
-    local x = state.data[state.pos]
-    local y = state.data[state.pos + 1]
+    local x = state.data[]
+    local y = state.data[]
     local s = model.s[i - 1]
     model.err[i], model.s[i] = unpack(model.rnns[i]:forward({x, y, s}))
-    state.pos = state.pos + 1
   end
   g_replace_table(model.start_s, model.s[params.seq_length])
   return model.err:mean()
@@ -178,9 +175,8 @@ function bp(state)
   paramdx:zero()
   reset_ds()
   for i = params.seq_length, 1, -1 do
-    state.pos = state.pos - 1
-    local x = state.data[state.pos]
-    local y = state.data[state.pos + 1]
+    local x = state.data[]
+    local y = state.data[]
     local s = model.s[i - 1]
     local derr = transfer_data(torch.ones(1))
     local tmp = model.rnns[i]:backward({x, y, s},
@@ -188,11 +184,38 @@ function bp(state)
     g_replace_table(model.ds, tmp)
     cutorch.synchronize()
   end
-  state.pos = state.pos + params.seq_length
   model.norm_dw = paramdx:norm()
   if model.norm_dw > params.max_grad_norm then
     local shrink_factor = params.max_grad_norm / model.norm_dw
     paramdx:mul(shrink_factor)
   end
   paramx:add(paramdx:mul(-params.lr))
+end
+
+
+function run_valid()
+  reset_state()
+  g_disable_dropout(model.rnns)
+  local perp = 0
+  for i = 1, params.seq_length do
+    perp = perp + fp(state_valid)
+  end
+  print("Validation set perplexity : " .. g_f3(torch.exp(perp / len)))
+  g_enable_dropout(model.rnns)
+end
+
+function run_test()
+  reset_state()
+  g_disable_dropout(model.rnns)
+  local perp = 0
+  g_replace_table(model.s[0], model.start_s)
+  for i = 1, params.seq_length do
+    local x = state_test.data[i]
+    local y = state_test.data[i + 1]
+    perp_tmp, model.s[1] = unpack(model.rnns[1]:forward({x, y, model.s[0]}))
+    perp = perp + perp_tmp[1]
+    g_replace_table(model.s[0], model.s[1])
+  end
+  print("Test set perplexity : " .. g_f3(torch.exp(perp / (len - 1))))
+  g_enable_dropout(model.rnns)
 end

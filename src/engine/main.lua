@@ -15,8 +15,7 @@ params = {batch_size=20,
                 init_weight=0.1,
                 lr=1,
                 input_dim=100,
-                max_epoch=4,
-                max_max_epoch=13,
+                max_steps=200,
                 max_grad_norm=5,
                 rows = 20, -- mem
                 cols = 20 -- mem
@@ -25,69 +24,6 @@ params = {batch_size=20,
 require('model')
 require('runner')
 require('utils')
-
-
-local state_train, state_valid, state_test
-local model = {}
-local paramx, paramdx
-
-local function main()
-  g_init_gpu(arg)
-  state_train = {data=transfer_data(ptb.traindataset(params.batch_size))}
-  state_valid =  {data=transfer_data(ptb.validdataset(params.batch_size))}
-  state_test =  {data=transfer_data(ptb.testdataset(params.batch_size))}
-  print("Network parameters:")
-  print(params)
-  local states = {state_train, state_valid, state_test}
-  for _, state in pairs(states) do
-    reset_state(state)
-  end
-  setup()
-  local step = 0
-  local epoch = 0
-  local total_cases = 0
-  local beginning_time = torch.tic()
-  local start_time = torch.tic()
-  print("Starting training.")
-  local words_per_step = params.seq_length * params.batch_size
-  local epoch_size = torch.floor(state_train.data:size(1) / params.seq_length)
-  local perps
-  while epoch < params.max_max_epoch do
-    local perp = fp(state_train)
-    if perps == nil then
-      perps = torch.zeros(epoch_size):add(perp)
-    end
-    perps[step % epoch_size + 1] = perp
-    step = step + 1
-    bp(state_train)
-    total_cases = total_cases + params.seq_length * params.batch_size
-    epoch = step / epoch_size
-    if step % torch.round(epoch_size / 10) == 10 then
-      local wps = torch.floor(total_cases / torch.toc(start_time))
-      local since_beginning = g_d(torch.toc(beginning_time) / 60)
-      print('epoch = ' .. g_f3(epoch) ..
-            ', train perp. = ' .. g_f3(torch.exp(perps:mean())) ..
-            ', wps = ' .. wps ..
-            ', dw:norm() = ' .. g_f3(model.norm_dw) ..
-            ', lr = ' ..  g_f3(params.lr) ..
-            ', since beginning = ' .. since_beginning .. ' mins.')
-    end
-    if step % epoch_size == 0 then
-      run_valid()
-      if epoch > params.max_epoch then
-          params.lr = params.lr / params.decay
-      end
-    end
-    if step % 33 == 0 then
-      cutorch.synchronize()
-      collectgarbage()
-    end
-  end
-  run_test()
-  print("Training is over.")
-end
-
--- main()
 
 local function local_coretest()
   core_network = create_network()
@@ -143,7 +79,65 @@ local function local_coretest()
     torch.zeros(params.batch_size, params.rows, params.cols):cuda()
   })
 end
-local_coretest()
+-- local_coretest()
 
--- model = setup()
--- print(model)
+model = setup()
+
+local state_train, state_valid, state_test
+local function load_fakedata()
+  return {
+    MEM = torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    prev_read_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    prev_read_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    prev_write_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    prev_write_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    true_read_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    true_read_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    true_write_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    true_write_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    true_write_erase = torch.rand(params.batch_size, params.rows, params.cols):cuda() 
+  }
+end
+
+
+local function main()
+  state_train = {data = load_fakedata()}
+  state_valid =  {data=load_fakedata()}
+  state_test =  {data=load_fakedata}
+
+  reset_state()
+
+  local step = 0
+  local epoch = 0
+  local total_cases = 0
+  local beginning_time = torch.tic()
+  local start_time = torch.tic()
+  print("Starting training.")
+
+  while step < params.max_steps do
+    local perf = fp(state_train)
+    bp(state_train)
+    step = step + 1
+    if math.fmod(step,2) == 0 then
+      print('epoch = ' .. g_f3(epoch) ..
+            ', train perp. = ' .. g_f3(torch.exp(perf:mean())) ..
+            ', dw:norm() = ' .. g_f3(model.norm_dw) ..
+            ', lr = ' ..  g_f3(params.lr) ..
+            ', since beginning = ' .. since_beginning .. ' mins.')
+ 
+      run_valid()
+    end
+
+    if math.fmod(step,50) then --learning rate decay
+      params.lr = params.lr / params.decay
+    end
+
+    if step % 33 == 0 then
+      cutorch.synchronize()
+      collectgarbage()
+    end
+  end
+
+  run_test()
+  print("Training is over.")
+end
