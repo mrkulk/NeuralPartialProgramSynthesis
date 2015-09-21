@@ -81,21 +81,14 @@ local function local_coretest()
 end
 -- local_coretest()
 
-model = setup()
-
 local state_train, state_valid, state_test
 local function load_fakedata()
   return {
-    MEM = torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    prev_read_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    prev_read_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    prev_write_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    prev_write_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    true_read_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    true_read_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    true_write_key = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    true_write_val = torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    true_write_erase = torch.rand(params.batch_size, params.rows, params.cols):cuda() 
+    true_read_key = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
+    true_read_val = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
+    true_write_key = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
+    true_write_val = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
+    true_write_erase = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda() 
   }
 end
 
@@ -104,7 +97,7 @@ local function main()
   state_train = {data = load_fakedata()}
   state_valid =  {data=load_fakedata()}
   state_test =  {data=load_fakedata}
-
+  model = setup()
   reset_state()
 
   local step = 0
@@ -125,7 +118,7 @@ local function main()
             ', lr = ' ..  g_f3(params.lr) ..
             ', since beginning = ' .. since_beginning .. ' mins.')
  
-      run_valid()
+      eval("Validation", state_valid)
     end
 
     if math.fmod(step,50) then --learning rate decay
@@ -138,6 +131,6 @@ local function main()
     end
   end
 
-  run_test()
+  eval("Test", state_test)
   print("Training is over.")
 end
