@@ -48,14 +48,15 @@ local function local_coretest()
     torch.rand(params.batch_size, params.rows, params.cols):cuda(),
     torch.rand(params.batch_size, params.rows, params.cols):cuda(),
     torch.rand(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
     torch.rand(params.batch_size, params.rows, params.cols):cuda()
     })
-  print(ret)
 
-  core_network:backward(
+  local ret = core_network:backward(
   {
     {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
     torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
+    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
     torch.rand(params.batch_size, params.rows, params.cols):cuda(),
     torch.rand(params.batch_size, params.rows, params.cols):cuda(),
     torch.rand(params.batch_size, params.rows, params.cols):cuda(),
@@ -78,6 +79,7 @@ local function local_coretest()
     torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
     torch.zeros(params.batch_size, params.rows, params.cols):cuda()
   })
+  print(ret)
 end
 -- local_coretest()
 
@@ -113,10 +115,9 @@ local function main()
     step = step + 1
     if math.fmod(step,2) == 0 then
       print('epoch = ' .. g_f3(epoch) ..
-            ', train perp. = ' .. g_f3(torch.exp(perf:mean())) ..
+            ', train perp. = ' .. g_f3(torch.exp(perf)) ..
             ', dw:norm() = ' .. g_f3(model.norm_dw) ..
-            ', lr = ' ..  g_f3(params.lr) ..
-            ', since beginning = ' .. since_beginning .. ' mins.')
+            ', lr = ' ..  params.lr)
  
       eval("Validation", state_valid)
     end
@@ -134,3 +135,5 @@ local function main()
   eval("Test", state_test)
   print("Training is over.")
 end
+
+main()

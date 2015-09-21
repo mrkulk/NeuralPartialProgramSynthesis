@@ -196,15 +196,26 @@ end
 
 function fp(state)
   reset_state()
-
   for i = 1, params.seq_length do
-    model.err_rk[i], model.err_rv[i], model.err_wk[i], model.err_wv[i], model.err_we[i], model.s[i], 
-    model.MEM[i], model.read_key[i], model.read_val[i], model.write_key[i], model.write_val[i], model.write_erase[i] = unpack(model.rnns[i]:forward({
+    local ret = model.rnns[i]:forward({
       model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
-      state.true_read_key[i], state.true_read_val[i], state.true_write_key[i], state.true_write_val[i], state.true_write_erase[i]
-    }))
+      state.data.true_read_key[i], state.data.true_read_val[i], state.data.true_write_key[i], state.data.true_write_val[i], state.data.true_write_erase[i]
+    })
+
+    model.err_rk[i] = ret[1][1]
+    model.err_rv[i] = ret[2][1]
+    model.err_wk[i] = ret[3][1]
+    model.err_wv[i] = ret[4][1]
+    model.err_we[i] = ret[5][1]
+    g_replace_table(model.s[i], ret[6])
+    model.MEM[i]:copy(ret[7]) 
+    model.read_key[i]:copy(ret[8])
+    model.read_val[i]:copy(ret[9])
+    model.write_key[i]:copy(ret[10])
+    model.write_val[i]:copy(ret[11])
+    model.write_erase[i]:copy(ret[12])
   end
-  g_replace_table(model.start_s, model.s[params.seq_length])
+  -- g_replace_table(model.start_s, model.s[params.seq_length])
   return model.err_rk:mean() + model.err_rv:mean() + model.err_wk:mean() + model.err_wv:mean() + model.err_we:mean()
 end
 
@@ -216,24 +227,23 @@ function bp(state)
     local derr_wk = transfer_data(torch.ones(1)); local derr_wv = transfer_data(torch.ones(1));
     local derr_we = transfer_data(torch.ones(1))
 
-    local tmp_s, tmp_MEM, tmp_rk, tmp_rv, tmp_wk, tmp_wv, tmp_we, t1,t2,t3,t4,t5  = unpack(model.rnns[i]:backward(
+    local ret = model.rnns[i]:backward(
     {
       model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
-      state.true_read_key[i], state.true_read_val[i], state.true_write_key[i], state.true_write_val[i], state.true_write_erase[i]
+      state.data.true_read_key[i], state.data.true_read_val[i], state.data.true_write_key[i], state.data.true_write_val[i], state.data.true_write_erase[i]
     },
     {
       derr_rk, derr_rv, derr_wk, derr_wv, derr_we,
       model.ds, model.ds_MEM, model.ds_read_key, model.ds_read_val, model.ds_write_key, model.ds_write_val, model.ds_write_erase
-    }
-    ))
+    })
 
-    g_replace_table(model.ds, tmp_s)
-    g_replace_table(model.ds_MEM, tmp_MEM)
-    g_replace_table(model.ds_read_key, tmp_rk)
-    g_replace_table(model.ds_read_val, tmo_rv)
-    g_replace_table(model.ds_write_key, tmp_wk)
-    g_replace_table(model.ds_write_val, tmp_wv)
-    g_replace_table(model.ds_write_erase, tmp_we)
+    g_replace_table(model.ds, ret[1])
+    model.ds_MEM:copy(ret[2])
+    model.ds_read_key:copy(ret[3])
+    model.ds_read_val:copy(ret[4])
+    model.ds_write_key:copy(ret[5])
+    model.ds_write_val:copy(ret[6])
+    model.ds_write_erase:copy(ret[7])
 
     cutorch.synchronize()
   end
@@ -253,6 +263,6 @@ function eval(mode, state)
   for i = 1, params.seq_length do
     perp = perp + fp(state)
   end
-  print(mode .. " set perplexity : " .. g_f3(torch.exp(perp / len)))
+  print(mode .. " set perplexity : " .. g_f3(torch.exp(perp / params.seq_length)))
   g_enable_dropout(model.rnns)
 end
