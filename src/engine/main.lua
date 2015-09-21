@@ -5,7 +5,6 @@ require('nngraph')
 require('base')
 require('srctransform')
 require('model')
-require('runner')
 require('utils')
 
 params = {
