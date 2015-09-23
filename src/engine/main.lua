@@ -33,11 +33,13 @@ file:close()
 require('tmp/modsrc.lua')
 -- program(params.batch_size, torch.rand(params.batch_size,1,10))
 
+local function extract_externals(cache_eids)
+  for i=1,#cache_eids do
+    EXTERNAL_CACHED_VALUES[cache_eids[i]] = model.write_val[cache_eids[i]]:float()
+  end
+end
 
 local function main()
-  model = setup()
-  reset_state()
-
   local step = 0
   local epoch = 0
   local total_cases = 0
@@ -47,15 +49,26 @@ local function main()
 
   engine_reset()
   program(params.batch_size, torch.rand(params.batch_size,1,10))
+  params.seq_length = CMD_NUM
+  local cache_eids = EXTERNAL_IDS
+
+  model = setup()
+  reset_state()
+
+  state_fake = {data = load_fakedata()}
 
   while step < params.max_steps do
     engine_reset() -- reset internal memory after each execution as well as other pointers
+    fp(state_fake) -- just to get outputs
+    extract_externals(cache_eids)
+
     program(params.batch_size, torch.rand(params.batch_size,1,10))
-    -- local perf = fp(state_train)
     -- bp(state_train)
-    print(EXTERNAL_IDS, CMD_NUM)
+    -- print(EXTERNAL_IDS, CMD_NUM)
+    
     print('Stepping ...')
     step = step + 1
+
     -- if math.fmod(step,2) == 0 then
     --   print('epoch = ' .. g_f3(epoch) ..
     --         ', train perp. = ' .. g_f3(torch.exp(perf)) ..

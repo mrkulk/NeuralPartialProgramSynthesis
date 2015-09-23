@@ -8,6 +8,7 @@ function engine_reset()
   MEMCNTR = 1
   CMD_NUM = 0
   EXTERNAL_IDS = {}
+  EXTERNAL_CACHED_VALUES = {}
 end
 
 
@@ -69,7 +70,16 @@ function syncMemory(BSIZE, lexp, rexp, mode)
       ckey = w_ckey:clone(),  --col key
       key = tkey,
       val = memory, 
-      mode = mode
+      mode = mode,
+      inversemapping = {
+        expr_type = lexp[1],
+        map = {
+          to_row = {vrows, vrows},
+          to_col = {start_col,end_col},
+          from_row = {INDX, INDX+ vrows - 1},
+          from_col = {start_col,end_col}
+        }
+      }
     }
   }
 
@@ -127,13 +137,16 @@ end
 
 
 function _nreg_forward(cmds)
-  local ret = 0
+  local ret = torch.zeros(params.batch_size) 
   for i=1,#cmds do
     local cmd = cmds[i]
     -- print(cmd)
     CMD_NUM = CMD_NUM + 1
     if cmd.mode == "external" then
       EXTERNAL_IDS[#EXTERNAL_IDS+1] = CMD_NUM
+      if EXTERNAL_CACHED_VALUES[CMD_NUM]~=nil then
+        print(cmd)
+      end
     end
   end
   return ret
@@ -193,7 +206,8 @@ function _nload_data(BSIZE, args)
       rkey = w_rkey:clone(), --row key
       ckey = w_ckey:clone(),  --col key
       key = tkey,
-      val = memory
+      val = memory,
+      mode = "load_data"
     }
   }
 
