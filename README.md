@@ -1,4 +1,4 @@
-# Neural Computers
+# Neural Partial Program Synthesis
 
 ## Requirements
 - luarocks install lpeg
