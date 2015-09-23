@@ -1,10 +1,14 @@
 
-rows = 20
-cols = 10
 
-VARLIST = {}
-MEMCNTR = 1
+function engine_reset()
+  rows = 20
+  cols = 10
 
+  VARLIST = {}
+  MEMCNTR = 1
+  CMD_NUM = 0
+  EXTERNAL_IDS = {}
+end
 
 
 function syncMemory(BSIZE, lexp, rexp, mode)
@@ -126,7 +130,11 @@ function _nreg_forward(cmds)
   local ret = 0
   for i=1,#cmds do
     local cmd = cmds[i]
-    print(cmd)
+    -- print(cmd)
+    CMD_NUM = CMD_NUM + 1
+    if cmd.mode == "external" then
+      EXTERNAL_IDS[#EXTERNAL_IDS+1] = CMD_NUM
+    end
   end
   return ret
 end
@@ -135,13 +143,16 @@ end
 function _nreg(BSIZE, lexp, rexp, mode)
     if lexp == "return" then
       local key = torch.zeros(BSIZE, rows, cols)
-      local cmd = {
+      local cmd = {}
+      cmd[1] =  {
         cmd = "read",
         rkey = VARLIST[rexp].rkey:clone(),
         ckey = VARLIST[rexp].ckey:clone(),
         key = VARLIST[rexp].key:clone(),
-        ret = true
+        ret = true,
+        mode = "return"
       }
+      print("RETURN:", CMD_NUM)
       _nreg_forward(cmd)
     else
       lhs_cmds, rhs_cmds = syncMemory(BSIZE, lexp, rexp, mode)
@@ -149,6 +160,7 @@ function _nreg(BSIZE, lexp, rexp, mode)
       -- print(rhs_cmds)
       -- exit()
       _nreg_forward(rhs_cmds)
+
       local ret = _nreg_forward(lhs_cmds)
       if mode == "external" then 
         print('TODO external')

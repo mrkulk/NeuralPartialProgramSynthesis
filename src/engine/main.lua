@@ -6,6 +6,7 @@ require('base')
 require('srctransform')
 require('model')
 require('utils')
+require('unittests')
 
 params = {
   batch_size=20,
@@ -23,21 +24,17 @@ params = {
   cols = 20 -- mem
 }
 
-local state_train, state_valid, state_test
-local function load_fakedata()
-  return {
-    true_read_key = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
-    true_read_val = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
-    true_write_key = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
-    true_write_val = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda(),
-    true_write_erase = torch.rand(params.seq_length, params.batch_size, params.rows, params.cols):cuda() 
-  }
-end
+transformer("testprogram.lua")
+print('Completed program source transformation ...\n\n')
+local file = io.open("tmp/modsrc.lua", "w")
+file:write(MODIFIED_SOURCE)
+file:close()
+
+require('tmp/modsrc.lua')
+-- program(params.batch_size, torch.rand(params.batch_size,1,10))
+
 
 local function main()
-  state_train = {data = load_fakedata()}
-  state_valid =  {data=load_fakedata()}
-  state_test =  {data=load_fakedata}
   model = setup()
   reset_state()
 
@@ -48,90 +45,38 @@ local function main()
   local start_time = torch.tic()
   print("Starting training.")
 
+  engine_reset()
+  program(params.batch_size, torch.rand(params.batch_size,1,10))
+
   while step < params.max_steps do
-    local perf = fp(state_train)
-    bp(state_train)
+    engine_reset() -- reset internal memory after each execution as well as other pointers
+    program(params.batch_size, torch.rand(params.batch_size,1,10))
+    -- local perf = fp(state_train)
+    -- bp(state_train)
+    print(EXTERNAL_IDS, CMD_NUM)
+    print('Stepping ...')
     step = step + 1
-    if math.fmod(step,2) == 0 then
-      print('epoch = ' .. g_f3(epoch) ..
-            ', train perp. = ' .. g_f3(torch.exp(perf)) ..
-            ', dw:norm() = ' .. g_f3(model.norm_dw) ..
-            ', lr = ' ..  params.lr)
+    -- if math.fmod(step,2) == 0 then
+    --   print('epoch = ' .. g_f3(epoch) ..
+    --         ', train perp. = ' .. g_f3(torch.exp(perf)) ..
+    --         ', dw:norm() = ' .. g_f3(model.norm_dw) ..
+    --         ', lr = ' ..  params.lr)
  
-      eval("Validation", state_valid)
-    end
+    --   eval("Validation", state_valid)
+    -- end
 
-    if math.fmod(step,50) then --learning rate decay
-      params.lr = params.lr / params.decay
-    end
+    -- if math.fmod(step,50) then --learning rate decay
+    --   params.lr = params.lr / params.decay
+    -- end
 
-    if step % 33 == 0 then
-      cutorch.synchronize()
-      collectgarbage()
-    end
+    -- if step % 33 == 0 then
+    --   cutorch.synchronize()
+    --   collectgarbage()
+    -- end
   end
 
-  eval("Test", state_test)
-  print("Training is over.")
+  -- eval("Test", state_test)
+  -- print("Training is over.")
 end
 
 main()
-
-
-local function local_coretest()
-  core_network = create_network()
-  core_network:cuda()
-  -- print(
-  --   core_network:forward({
-  --     torch.zeros(params.batch_size, params.rnn_size):cuda(),
-  --     torch.zeros(params.batch_size):cuda(),
-  --     {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
-  --     torch.zeros(params.batch_size, params.rows, params.cols):cuda()
-  --   })
-  -- )  
-  print(params)
-  local ret = core_network:forward({
-    {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda()
-    })
-
-  local ret = core_network:backward(
-  {
-    {torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda(), torch.zeros(params.batch_size, params.rnn_size):cuda() },
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda(),
-    torch.rand(params.batch_size, params.rows, params.cols):cuda()
-  },
-  {
-    torch.zeros(1):cuda(),torch.zeros(1):cuda(),torch.zeros(1):cuda(),torch.zeros(1):cuda(),torch.zeros(1):cuda(),
-    {torch.zeros(params.batch_size, params.rnn_size):cuda(),torch.zeros(params.batch_size, params.rnn_size):cuda(),
-    torch.zeros(params.batch_size, params.rnn_size):cuda(),torch.zeros(params.batch_size, params.rnn_size):cuda()
-    },
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda(),
-    torch.zeros(params.batch_size, params.rows, params.cols):cuda()
-  })
-  print(ret)
-end
--- local_coretest()
