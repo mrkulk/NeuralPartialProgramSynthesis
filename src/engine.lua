@@ -145,7 +145,14 @@ function _nreg_forward(cmds)
     if cmd.mode == "external" then
       EXTERNAL_IDS[#EXTERNAL_IDS+1] = CMD_NUM
       if EXTERNAL_CACHED_VALUES[CMD_NUM]~=nil then
-        print(cmd)
+        if cmd.inversemapping.expr_type == "MemberExpression" then
+          ret = EXTERNAL_CACHED_VALUES[CMD_NUM][{{}, {cmd.inversemapping.map.from_row[1], cmd.inversemapping.map.from_row[2]},
+                         {cmd.inversemapping.map.from_col[1], cmd.inversemapping.map.from_col[2]}}]
+        else
+          print(cmd)
+          print('ERROR: Not Implemented')
+          exit()
+        end
       end
     end
   end
