@@ -16,7 +16,7 @@ params = {
   rnn_size=200,
   dropout=0,
   init_weight=0.1,
-  lr=1,
+  lr=0.001,
   input_dim=100,
   max_steps=200,
   max_grad_norm=5,
@@ -62,21 +62,24 @@ local function main()
     fp("fake", state_fake) -- just to get outputs
     extract_externals(cache_eids)
     -- Now holes in the program have been filled by neural network. Execute program.
-    program(params.batch_size, torch.rand(params.batch_size,1,10))
-    fp("real", nil)
+    local train_data = torch.rand(params.batch_size,1,10)
+    program(params.batch_size, train_data)
+    local predicted_output, target_output, total_err = fp("real", nil)
     bp("real", nil)
     
     print('Stepping ...')
     step = step + 1
 
-    -- if math.fmod(step,2) == 0 then
-    --   print('epoch = ' .. g_f3(epoch) ..
-    --         ', train perp. = ' .. g_f3(torch.exp(perf)) ..
-    --         ', dw:norm() = ' .. g_f3(model.norm_dw) ..
-    --         ', lr = ' ..  params.lr)
+    local score = (torch.pow(predicted_output - target_output, 2):sum())/(params.batch_size)
+
+    if math.fmod(step,2) == 0 then
+      print('epoch = ' .. g_f3(epoch) ..
+            ', train perp. = ' .. score ..
+            ', dw:norm() = ' .. g_f3(model.norm_dw) ..
+            ', lr = ' ..  params.lr)
  
-    --   eval("Validation", state_valid)
-    -- end
+      -- eval("Validation", state_valid)
+    end
 
     -- if math.fmod(step,50) then --learning rate decay
     --   params.lr = params.lr / params.decay

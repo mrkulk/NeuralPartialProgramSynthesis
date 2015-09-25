@@ -85,7 +85,7 @@ function syncMemory(BSIZE, lexp, rexp, mode)
   }
 
   if VARLIST[vname] == nil then
-    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR, key = tkey }
+    VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR, key = tkey, memory = memory }
   end
 
   MEMCNTR = MEMCNTR + vrows
@@ -170,7 +170,8 @@ function _nreg(BSIZE, lexp, rexp, mode)
         ckey = VARLIST[rexp].ckey:clone(),
         key = VARLIST[rexp].key:clone(),
         ret = true,
-        mode = "return"
+        mode = "return",
+        memory = VARLIST[rexp].memory:clone()
       }
       _nreg_forward(cmd)
     else

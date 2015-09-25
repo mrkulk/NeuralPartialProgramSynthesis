@@ -195,6 +195,7 @@ function reset_ds()
 end
 
 function fp(mode, state)
+  local target_ret, predicted_ret --final return value (target and predicted)
   reset_state()
   for i = 1, params.seq_length do
     local ret
@@ -215,7 +216,12 @@ function fp(mode, state)
         we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
       else
         rk = TARGET_CACHE[i].key:cuda()
-        rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        if TARGET_CACHE[i].mode == "return" then
+          rv = TARGET_CACHE[i].memory:cuda()
+          target_ret = rv:float()
+        else
+          rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        end
         wk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         wv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
@@ -225,6 +231,10 @@ function fp(mode, state)
         model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
         rk, rv, wk, wv, we
       })    
+
+      if TARGET_CACHE[i].mode == "return" then
+        predicted_ret = ret[9]:float() --read_val
+      end
     end
 
     model.err_rk[i] = ret[1][1]
@@ -241,7 +251,7 @@ function fp(mode, state)
     model.write_erase[i]:copy(ret[12])
   end
   -- g_replace_table(model.start_s, model.s[params.seq_length])
-  return model.err_rk:mean() + model.err_rv:mean() + model.err_wk:mean() + model.err_wv:mean() + model.err_we:mean()
+  return predicted_ret, target_ret, model.err_rk:mean() + model.err_rv:mean() + model.err_wk:mean() + model.err_wv:mean() + model.err_we:mean()
 end
 
 function bp(mode,state)
@@ -276,10 +286,16 @@ function bp(mode,state)
         wv = TARGET_CACHE[i].val:cuda()
         we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
       else
-        derr_rk = transfer_data(torch.ones(1)); derr_rv = transfer_data(torch.ones(1))
+        derr_rk = transfer_data(torch.ones(1)); 
         derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.zeros(1)); derr_we = transfer_data(torch.zeros(1))
         rk = TARGET_CACHE[i].key:cuda()
-        rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        if TARGET_CACHE[i].mode == "return" then
+          rv = TARGET_CACHE[i].memory:cuda()
+          derr_rv = transfer_data(torch.ones(1)) --read output 
+        else
+          rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+          derr_rv = transfer_data(torch.zeros(1)) --if we write properly, read will be good
+        end
         wk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         wv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
