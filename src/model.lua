@@ -194,13 +194,38 @@ function reset_ds()
   model.ds_write_erase:zero()
 end
 
-function fp(state)
+function fp(mode, state)
   reset_state()
   for i = 1, params.seq_length do
-    local ret = model.rnns[i]:forward({
-      model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
-      state.data.true_read_key[i], state.data.true_read_val[i], state.data.true_write_key[i], state.data.true_write_val[i], state.data.true_write_erase[i]
-    })
+    local ret
+
+    if mode == "fake" then
+      ret = model.rnns[i]:forward({
+        model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
+        state.data.true_read_key[i], state.data.true_read_val[i], state.data.true_write_key[i], state.data.true_write_val[i], state.data.true_write_erase[i]
+      })
+    else
+
+      local rk, rv, wk, wv, we
+      if TARGET_CACHE[i].cmd == "write" then
+        rk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        wk = TARGET_CACHE[i].key:cuda()
+        wv = TARGET_CACHE[i].val:cuda()
+        we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+      else
+        rk = TARGET_CACHE[i].key:cuda()
+        rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        wk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        wv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+      end
+
+      ret = model.rnns[i]:forward({
+        model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
+        rk, rv, wk, wv, we
+      })    
+    end
 
     model.err_rk[i] = ret[1][1]
     model.err_rv[i] = ret[2][1]
@@ -219,23 +244,58 @@ function fp(state)
   return model.err_rk:mean() + model.err_rv:mean() + model.err_wk:mean() + model.err_wv:mean() + model.err_we:mean()
 end
 
-function bp(state)
+function bp(mode,state)
   paramdx:zero()
   reset_ds()
   for i = params.seq_length, 1, -1 do
-    local derr_rk = transfer_data(torch.ones(1)); local derr_rv = transfer_data(torch.ones(1));
-    local derr_wk = transfer_data(torch.ones(1)); local derr_wv = transfer_data(torch.ones(1));
-    local derr_we = transfer_data(torch.ones(1))
+    local derr_rk, derr_rv, derr_wk, derr_wv, derr_we
 
-    local ret = model.rnns[i]:backward(
-    {
-      model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
-      state.data.true_read_key[i], state.data.true_read_val[i], state.data.true_write_key[i], state.data.true_write_val[i], state.data.true_write_erase[i]
-    },
-    {
-      derr_rk, derr_rv, derr_wk, derr_wv, derr_we,
-      model.ds, model.ds_MEM, model.ds_read_key, model.ds_read_val, model.ds_write_key, model.ds_write_val, model.ds_write_erase
-    })
+    local ret
+    if mode == "fake" then
+      derr_rk = transfer_data(torch.ones(1)); derr_rv = transfer_data(torch.ones(1))
+      derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.ones(1)); derr_we = transfer_data(torch.ones(1))
+
+      ret = model.rnns[i]:backward(
+      {
+        model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
+        state.data.true_read_key[i], state.data.true_read_val[i], state.data.true_write_key[i], state.data.true_write_val[i], state.data.true_write_erase[i]
+      },
+      {
+        derr_rk, derr_rv, derr_wk, derr_wv, derr_we,
+        model.ds, model.ds_MEM, model.ds_read_key, model.ds_read_val, model.ds_write_key, model.ds_write_val, model.ds_write_erase
+      })
+    else
+
+      local rk, rv, wk, wv, we
+      if TARGET_CACHE[i].cmd == "write" then
+        derr_rk = transfer_data(torch.ones(1)); derr_rv = transfer_data(torch.zeros(1))
+        derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.ones(1)); derr_we = transfer_data(torch.ones(1))
+        rk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        wk = TARGET_CACHE[i].key:cuda()
+        wv = TARGET_CACHE[i].val:cuda()
+        we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+      else
+        derr_rk = transfer_data(torch.ones(1)); derr_rv = transfer_data(torch.ones(1))
+        derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.zeros(1)); derr_we = transfer_data(torch.zeros(1))
+        rk = TARGET_CACHE[i].key:cuda()
+        rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        wk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        wv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        we = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+      end
+
+      ret = model.rnns[i]:backward(
+      {
+        model.s[i-1], model.MEM[i-1], model.read_key[i-1], model.read_val[i-1], model.write_key[i-1], model.write_val[i-1], model.write_erase[i-1],
+        rk, rv, wk, wv, we
+      },
+      {
+        derr_rk, derr_rv, derr_wk, derr_wv, derr_we,
+        model.ds, model.ds_MEM, model.ds_read_key, model.ds_read_val, model.ds_write_key, model.ds_write_val, model.ds_write_erase
+      })   
+    end
+
 
     g_replace_table(model.ds, ret[1])
     model.ds_MEM:copy(ret[2])

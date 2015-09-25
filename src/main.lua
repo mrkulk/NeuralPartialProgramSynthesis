@@ -21,7 +21,7 @@ params = {
   max_steps=200,
   max_grad_norm=5,
   rows = 20, -- mem
-  cols = 20 -- mem
+  cols = 10 -- mem
 }
 
 transformer("testprogram.lua")
@@ -59,12 +59,12 @@ local function main()
 
   while step < params.max_steps do
     engine_reset() -- reset internal memory after each execution as well as other pointers
-    fp(state_fake) -- just to get outputs
+    fp("fake", state_fake) -- just to get outputs
     extract_externals(cache_eids)
-
+    -- Now holes in the program have been filled by neural network. Execute program.
     program(params.batch_size, torch.rand(params.batch_size,1,10))
-    -- bp(state_train)
-    -- print(EXTERNAL_IDS, CMD_NUM)
+    fp("real", nil)
+    bp("real", nil)
     
     print('Stepping ...')
     step = step + 1

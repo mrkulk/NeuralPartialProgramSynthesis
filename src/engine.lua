@@ -1,14 +1,15 @@
 
 
 function engine_reset()
-  rows = 20
-  cols = 10
+  rows = params.rows
+  cols = params.cols
 
   VARLIST = {}
   MEMCNTR = 1
   CMD_NUM = 0
   EXTERNAL_IDS = {}
   EXTERNAL_CACHED_VALUES = {}
+  TARGET_CACHE = {} --stores target values. happens in forward. need to run this before backward pass
 end
 
 
@@ -140,8 +141,8 @@ function _nreg_forward(cmds)
   local ret = torch.zeros(params.batch_size) 
   for i=1,#cmds do
     local cmd = cmds[i]
-    -- print(cmd)
     CMD_NUM = CMD_NUM + 1
+    TARGET_CACHE[CMD_NUM] = cmd
     if cmd.mode == "external" then
       EXTERNAL_IDS[#EXTERNAL_IDS+1] = CMD_NUM
       if EXTERNAL_CACHED_VALUES[CMD_NUM]~=nil then
@@ -162,7 +163,6 @@ end
 
 function _nreg(BSIZE, lexp, rexp, mode)
     if lexp == "return" then
-      local key = torch.zeros(BSIZE, rows, cols)
       local cmd = {}
       cmd[1] =  {
         cmd = "read",
@@ -172,18 +172,12 @@ function _nreg(BSIZE, lexp, rexp, mode)
         ret = true,
         mode = "return"
       }
-      print("RETURN:", CMD_NUM)
       _nreg_forward(cmd)
     else
       lhs_cmds, rhs_cmds = syncMemory(BSIZE, lexp, rexp, mode)
-      -- print(rhs_cmds)
-      -- print(rhs_cmds)
-      -- exit()
       _nreg_forward(rhs_cmds)
-
       local ret = _nreg_forward(lhs_cmds)
       if mode == "external" then 
-        print('TODO external')
         return ret
       end
     end
@@ -217,7 +211,7 @@ function _nload_data(BSIZE, args)
       mode = "load_data"
     }
   }
-
+  _nreg_forward(cmd)
   local vname = "args"
   if VARLIST[vname] == nil then
     VARLIST[vname] = { rkey = w_rkey, ckey = w_ckey, INDX = MEMCNTR, key = tkey }
