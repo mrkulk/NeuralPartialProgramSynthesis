@@ -39,6 +39,20 @@ local function extract_externals(cache_eids)
   end
 end
 
+
+local function gt_program(BSIZE, args)
+  a=torch.zeros(BSIZE,1,10)
+  fac = 30
+  mult = 5
+  dummy = fac * 4
+  for indx=1,10 do
+    a[{{},{1,1},{indx,indx}}]  = args[{{},{1,1},{indx,indx}}]*fac + args[{{},{1,1},{1,1}}]*mult
+  end
+  return a
+end
+
+
+
 local function main()
   local step = 0
   local epoch = 0
@@ -64,8 +78,9 @@ local function main()
     -- Now holes in the program have been filled by neural network. Execute program.
     local train_data = torch.rand(params.batch_size,1,10)
     program(params.batch_size, train_data)
-    local predicted_output, target_output, total_err = fp("real", nil)
-    bp("real", nil)
+    local program_out = gt_program(params.batch_size, train_data)
+    local predicted_output, target_output, total_err = fp("real", nil, program_out)
+    bp("real", nil, program_out)
     
     print('Stepping ...')
     step = step + 1
@@ -74,10 +89,10 @@ local function main()
 
     if math.fmod(step,2) == 0 then
       print('epoch = ' .. g_f3(epoch) ..
-            ', train perp. = ' .. score ..
+            ', MSE = ' .. score ..
             ', dw:norm() = ' .. g_f3(model.norm_dw) ..
             ', lr = ' ..  params.lr)
- 
+      -- print(predicted_output[1])
       -- eval("Validation", state_valid)
     end
 

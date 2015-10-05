@@ -194,8 +194,8 @@ function reset_ds()
   model.ds_write_erase:zero()
 end
 
-function fp(mode, state)
-  local target_ret, predicted_ret --final return value (target and predicted)
+function fp(mode, state, target)
+  local predicted_ret, target_ret --final return value (target and predicted)
   reset_state()
   for i = 1, params.seq_length do
     local ret
@@ -217,7 +217,11 @@ function fp(mode, state)
       else
         rk = TARGET_CACHE[i].key:cuda()
         if TARGET_CACHE[i].mode == "return" then
-          rv = TARGET_CACHE[i].memory:cuda()
+          local map = TARGET_CACHE[i].map
+          rv = torch.zeros(params.batch_size, params.rows, params.cols)
+          rv[{{}, {map.from_row[1], map.from_row[2]}, {map.from_col[1], map.from_col[2]}}] = target
+          rv = rv:cuda()
+          -- rv = TARGET_CACHE[i].memory:cuda()
           target_ret = rv:float()
         else
           rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
@@ -254,7 +258,7 @@ function fp(mode, state)
   return predicted_ret, target_ret, model.err_rk:mean() + model.err_rv:mean() + model.err_wk:mean() + model.err_wv:mean() + model.err_we:mean()
 end
 
-function bp(mode,state)
+function bp(mode,state, target)
   paramdx:zero()
   reset_ds()
   for i = params.seq_length, 1, -1 do
@@ -290,7 +294,12 @@ function bp(mode,state)
         derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.zeros(1)); derr_we = transfer_data(torch.zeros(1))
         rk = TARGET_CACHE[i].key:cuda()
         if TARGET_CACHE[i].mode == "return" then
-          rv = TARGET_CACHE[i].memory:cuda()
+          -- rv = TARGET_CACHE[i].memory:cuda()
+          local map = TARGET_CACHE[i].map
+          rv = torch.zeros(params.batch_size, params.rows, params.cols)
+          rv[{{}, {map.from_row[1], map.from_row[2]}, {map.from_col[1], map.from_col[2]}}] = target
+          rv = rv:cuda()
+
           derr_rv = transfer_data(torch.ones(1)) --read output 
         else
           rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
