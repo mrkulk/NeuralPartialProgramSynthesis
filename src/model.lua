@@ -332,6 +332,12 @@ function bp(mode,state, target)
     model.ds_write_key:copy(ret[5])
     model.ds_write_val:copy(ret[6])
     model.ds_write_erase:copy(ret[7])
+
+    -- print('------------')
+    -- for ii=1,7 do
+    --   print(ret[ii][1]:sum())
+    -- end
+
     cutorch.synchronize()
   end
   model.norm_dw = paramdx:norm()
