@@ -10,6 +10,7 @@ function engine_reset()
   EXTERNAL_IDS = {}
   EXTERNAL_CACHED_VALUES = {}
   TARGET_CACHE = {} --stores target values. happens in forward. need to run this before backward pass
+  WORKING_MEMORY = torch.zeros(params.batch_size, rows, cols)
 end
 
 
@@ -27,7 +28,7 @@ function syncMemory(BSIZE, lexp, rexp, mode)
   if lexp[1] == "Identifier" then
     vname = lexp[2]; val = lexp[3]
     if type(val) == type(1) then
-      vrows = 1; start_col=1;end_col = cols
+      vrows = 1; start_col=1;end_col = 1--cols
     else
       local sz = val:size()
       vrows = sz[2]; start_col=1;end_col = sz[3]
@@ -62,8 +63,12 @@ function syncMemory(BSIZE, lexp, rexp, mode)
   local memory = torch.zeros(BSIZE, rows, cols)
   -- print(memory[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}])
   -- print(val)
-
   memory[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}] = val
+
+  local WRITE_ERASE_CACHE = torch.zeros(params.batch_size, rows, cols)
+  WRITE_ERASE_CACHE[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}] = WORKING_MEMORY[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}]
+  WORKING_MEMORY[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}] = val
+
   lhs_cmds = {
     [1] = {
       cmd = "write",
@@ -72,6 +77,7 @@ function syncMemory(BSIZE, lexp, rexp, mode)
       key = tkey,
       val = memory, 
       mode = mode,
+      write_erase_cache = WRITE_ERASE_CACHE,
       inversemapping = {
         expr_type = lexp[1],
         map = {
@@ -210,6 +216,11 @@ function _nload_data(BSIZE, args)
 
   local memory = torch.zeros(BSIZE, rows, cols)
   memory[{{},{INDX, INDX+ vrows - 1}, {start_col,end_col}}] = args
+
+  local WRITE_ERASE_CACHE = torch.zeros(params.batch_size, rows, cols)
+  WRITE_ERASE_CACHE[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}] = WORKING_MEMORY[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}]
+  WORKING_MEMORY[{{}, {INDX, INDX+ vrows - 1}, {start_col,end_col}}] = args
+
   local cmd = {
     [1] = {
       cmd = "write",
@@ -217,6 +228,7 @@ function _nload_data(BSIZE, args)
       ckey = w_ckey:clone(),  --col key
       key = tkey,
       val = memory,
+      write_erase_cache = WRITE_ERASE_CACHE,
       mode = "load_data"
     }
   }

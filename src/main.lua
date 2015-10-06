@@ -9,7 +9,7 @@ require('utils')
 require('unittests')
 
 params = {
-  batch_size=5,
+  batch_size=100,
   seq_length=20,
   layers=2,
   decay=2,
@@ -43,8 +43,8 @@ end
 
 local function gt_program(BSIZE, args)
   a=torch.zeros(BSIZE,1,10)
-  fac = 30
-  mult = 5
+  fac = 0.5
+  mult = 0.2
   dummy = fac * 4
   for indx=1,10 do
     a[{{},{1,1},{indx,indx}}]  = args[{{},{1,1},{indx,indx}}]*fac + args[{{},{1,1},{1,1}}]*mult
@@ -77,25 +77,36 @@ local function main()
     fp("fake", state_fake) -- just to get outputs
     extract_externals(cache_eids)
     -- Now holes in the program have been filled by neural network. Execute program.
-    local train_data = torch.rand(params.batch_size,1,10)
+    local train_data = torch.rand(params.batch_size,1,10)*5-0.5
     program(params.batch_size, train_data)
     local program_out = gt_program(params.batch_size, train_data)
     local predicted_output, target_output, total_err = fp("real", nil, program_out)
     bp("real", nil, program_out)
     
-    print('Stepping ...')
     step = step + 1
 
-    local score = (torch.pow(predicted_output - target_output, 2):sum())/(params.batch_size)
+    local train_score = (torch.pow(predicted_output - target_output, 2):sum())/(params.batch_size)
 
-    if math.fmod(step,2) == 0 then
-      print('epoch = ' .. g_f3(epoch) ..
-            ', MSE = ' .. score ..
+    if math.fmod(step,10) == 0 then
+      engine_reset() -- reset internal memory after each execution as well as other pointers
+      fp("fake", state_fake) -- just to get outputs
+      extract_externals(cache_eids)
+      local test_data = torch.repeatTensor(torch.Tensor({{-0.5,1,0.3,0.4,-0.2,0.1,-0.34,0.2,-0.9,0.5}}), params.batch_size,1, 1)*5
+
+      program(params.batch_size, test_data)
+      local test_program_out = gt_program(params.batch_size, test_data)
+      local test_predicted_output, test_target_output, test_total_err = fp("real", nil, test_program_out)
+      local test_score = (torch.pow(test_predicted_output - test_target_output, 2):sum())/(params.batch_size)
+      print('\n\n----------------------------------------------\n' ..
+            'epoch = ' .. g_f3(epoch) ..
+            ', MSE = ' .. test_score ..
+            ', err = ' .. test_total_err ..
             ', dw:norm() = ' .. g_f3(model.norm_dw) ..
             ', lr = ' ..  params.lr)
-      print('TARGET:\n', target_output[1][2])
-      print('PREDICTED:', predicted_output[1][2])
-      -- eval("Validation", state_valid)
+      print('TARGET     PREDICTED')
+      for cc=1,cols do 
+        print(g_f3(test_target_output[1][2][cc]) .. "   " .. g_f3(test_predicted_output[1][2][cc]))
+      end
     end
 
     -- if math.fmod(step,50) then --learning rate decay

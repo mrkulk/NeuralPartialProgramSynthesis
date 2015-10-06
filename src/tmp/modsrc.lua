@@ -3,10 +3,10 @@ function program(BSIZE, args)
 _nload_data(BSIZE,args)
   a=torch.zeros(BSIZE,1,10)
 _nreg(BSIZE, {'Identifier','a',a},{{'CallExpression','zeros',zeros},})
-  fac = 30
-_nreg(BSIZE, {'Identifier','fac',fac},{{'Literal','30',30},})
-  mult = 5
-_nreg(BSIZE, {'Identifier','mult',mult},{{'Literal','5',5},})
+  fac = 0.5
+_nreg(BSIZE, {'Identifier','fac',fac},{{'Literal','0.5',0.5},})
+  mult = 0.2
+_nreg(BSIZE, {'Identifier','mult',mult},{{'Literal','0.2',0.2},})
   dummy = fac * 4
 _nreg(BSIZE, {'Identifier','dummy',dummy},{{'Identifier','fac',fac},{'Literal','4',4},})
   for indx=1,10 do
