@@ -1,5 +1,6 @@
 require 'Normalize'
 require 'componentMul'
+require 'GradScale'
 
 function transfer_data(x)
   return x:cuda()
@@ -78,11 +79,13 @@ function create_network()
 
   ---------------------- Memory Ops ------------------
   local read_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
-  local read_key = nn.Reshape(params.rows,params.cols)(nn.Normalize()(nn.SoftMax()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel))))
+  -- local read_key = nn.Reshape(params.rows,params.cols)(nn.SoftMax()(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel))))
+  local read_key = nn.Reshape(params.rows,params.cols)(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel)))
   local read_val = nn.componentMul()({MEM, read_key})
 
   local write_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
-  local write_key = nn.Reshape(params.rows,params.cols)(nn.Normalize()(nn.SoftMax()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel))))
+  -- local write_key = nn.Reshape(params.rows,params.cols)(nn.SoftMax()(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel))))
+  local write_key = nn.Reshape(params.rows,params.cols)(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)))
   local write_val = nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)) 
   local write_erase = nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)) 
 
@@ -91,7 +94,7 @@ function create_network()
   local erase_MEM = nn.componentMul()({MEM, erase_val})
 
   local add_val_interim = nn.componentMul()({write_key, write_val})
-  local add_MEM = nn.CAddTable()({erase_MEM, add_val_interim})
+  local add_MEM = nn.GradScale(params.MEM_gscale)(nn.CAddTable()({erase_MEM, add_val_interim}))
 
   local err_rk = nn.MSECriterion()({read_key, nn.Reshape(params.rows * params.cols)(true_read_key)})
   local err_rv = nn.MSECriterion()({read_val, nn.Reshape(params.rows * params.cols)(true_read_val)})
@@ -329,7 +332,6 @@ function bp(mode,state, target)
     model.ds_write_key:copy(ret[5])
     model.ds_write_val:copy(ret[6])
     model.ds_write_erase:copy(ret[7])
-
     cutorch.synchronize()
   end
   model.norm_dw = paramdx:norm()

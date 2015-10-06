@@ -6,6 +6,7 @@ end
  
 function componentMul:updateOutput(input)
    self.output = torch.cmul(input[1], input[2])
+   -- print(input[2][1])
    return self.output
 end
 

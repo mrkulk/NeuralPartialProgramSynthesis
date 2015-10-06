@@ -9,19 +9,20 @@ require('utils')
 require('unittests')
 
 params = {
-  batch_size=20,
+  batch_size=5,
   seq_length=20,
   layers=2,
   decay=2,
   rnn_size=200,
   dropout=0,
   init_weight=0.1,
-  lr=0.001,
+  lr=1e-3,
   input_dim=100,
-  max_steps=200,
-  max_grad_norm=5,
+  max_steps=2000,
+  max_grad_norm=200,--5,
   rows = 20, -- mem
-  cols = 10 -- mem
+  cols = 10, -- mem,
+  MEM_gscale = 1
 }
 
 transformer("testprogram.lua")
@@ -92,7 +93,8 @@ local function main()
             ', MSE = ' .. score ..
             ', dw:norm() = ' .. g_f3(model.norm_dw) ..
             ', lr = ' ..  params.lr)
-      -- print(predicted_output[1])
+      print('TARGET:\n', target_output[1][2])
+      print('PREDICTED:', predicted_output[1][2])
       -- eval("Validation", state_valid)
     end
 
