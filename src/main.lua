@@ -9,9 +9,9 @@ require('utils')
 require('unittests')
 
 params = {
-  batch_size=100,
+  batch_size=30,
   seq_length=20,
-  layers=2,
+  layers=1,
   decay=2,
   rnn_size=200,
   dropout=0,

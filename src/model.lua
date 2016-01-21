@@ -1,4 +1,4 @@
-require 'Normalize'
+-- require 'Normalize'
 require 'componentMul'
 require 'GradScale'
 require 'PowTable'
@@ -79,29 +79,29 @@ function create_network()
   -- local pred             = nn.LogSoftMax()(h2y(dropped))
 
   ---------------------- Memory Ops ------------------
-  local read_channel = nn.ReLU()(i[params.layers])--nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
-  -- local read_key = nn.Reshape(params.rows,params.cols)(nn.SoftMax()(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel))))
-  local read_key = nn.Reshape(params.rows,params.cols)(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel)))
+  local read_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
+  local read_key = nn.GradScale(1e-1)(nn.Reshape(params.rows,params.cols)(nn.Identity()(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(read_channel)))))
+  -- local read_key = nn.GradScale(1e-1)(nn.Reshape(params.rows,params.cols)(nn.Identity()(nn.Linear(params.rnn_size*2, params.rows*params.cols)(read_channel))))
   -- local read_key = nn.Power(1.5)(read_key1)
-  local read_val = nn.componentMul()({MEM, read_key})
+  local read_val = nn.GradScale(1e-1)(nn.CMulTable()({MEM, read_key}))
 
-  local write_channel = nn.ReLU()(i[params.layers])--nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
-  -- local write_key = nn.Reshape(params.rows,params.cols)(nn.SoftMax()(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel))))
-  local write_key = nn.Reshape(params.rows,params.cols)(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)))
+  local write_channel = nn.ReLU()(nn.Linear(params.rnn_size,params.rnn_size)(i[params.layers]))
+  local write_key = nn.GradScale(1e-1)(nn.Reshape(params.rows,params.cols)(nn.Identity()(nn.Sigmoid()(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)))))
+  -- local write_key = nn.GradScale(1e-1)(nn.Reshape(params.rows,params.cols)(nn.Identity()(nn.Linear(params.rnn_size*2, params.rows*params.cols)(write_channel))))
   -- local write_key = nn.Power(1.5)(write_key1)
-  local write_val = nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)) 
-  local write_erase = nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)) 
+  local write_val = nn.GradScale(1e-1)(nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)))
+  local write_erase = nn.GradScale(1e-1)(nn.Reshape(params.rows,params.cols)(nn.Linear(params.rnn_size, params.rows*params.cols)(write_channel)))
 
-  local erase_val_interim = nn.componentMul()({write_key, write_erase})
+  local erase_val_interim = nn.CMulTable()({write_key, write_erase})
   local erase_val = nn.AddConstant(1)(nn.MulConstant(-1)(erase_val_interim))
-  local erase_MEM = nn.componentMul()({MEM, erase_val})
+  local erase_MEM = nn.CMulTable()({MEM, erase_val})
 
-  local add_val_interim = nn.componentMul()({write_key, write_val})
+  local add_val_interim = nn.CMulTable()({write_key, write_val})
   local add_MEM = nn.CAddTable()({erase_MEM, add_val_interim})
 
-  local err_rk = nn.DistKLDivCriterion()({read_key, nn.Reshape(params.rows * params.cols)(true_read_key)})
+  local err_rk = nn.MSECriterion()({read_key, nn.Reshape(params.rows * params.cols)(true_read_key)})
   local err_rv = nn.MSECriterion()({read_val, nn.Reshape(params.rows * params.cols)(true_read_val)})
-  local err_wk = nn.DistKLDivCriterion()({write_key, nn.Reshape(params.rows * params.cols)(true_write_key)})
+  local err_wk = nn.MSECriterion()({write_key, nn.Reshape(params.rows * params.cols)(true_write_key)})
   local err_wv = nn.MSECriterion()({write_val, nn.Reshape(params.rows * params.cols)(true_write_val)})
   local err_we = nn.MSECriterion()({write_erase, nn.Reshape(params.rows * params.cols)(true_write_erase)})
 
@@ -218,19 +218,19 @@ function fp(mode, state, target)
       if TARGET_CACHE[i].cmd == "write" then
         rk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
-        wk = TARGET_CACHE[i].key:cuda()
-        wv = TARGET_CACHE[i].val:cuda()
+        wk = TARGET_CACHE[i].key:clone(); wk = wk:cuda()
+        wv = TARGET_CACHE[i].val:clone(); wv = wv:cuda()
         -- print(TARGET_CACHE[i].write_erase_cache:sum())
-        we = TARGET_CACHE[i].write_erase_cache:cuda()-- torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+        we = TARGET_CACHE[i].write_erase_cache:clone();we = we:cuda()-- torch.zeros(params.batch_size, params.rows, params.cols):cuda()
       else
         rk = TARGET_CACHE[i].key:cuda()
         if TARGET_CACHE[i].mode == "return" then
           local map = TARGET_CACHE[i].map
           rv = torch.zeros(params.batch_size, params.rows, params.cols)
-          rv[{{}, {map.from_row[1], map.from_row[2]}, {map.from_col[1], map.from_col[2]}}] = target
+          rv[{{}, {map.from_row[1], map.from_row[2]}, {map.from_col[1], map.from_col[2]}}] = target:clone()
           rv = rv:cuda()
           -- rv = TARGET_CACHE[i].memory:cuda()
-          target_ret = rv:float()
+          target_ret = rv:clone(); target_ret = target_ret:float()
         else
           rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         end
@@ -245,6 +245,7 @@ function fp(mode, state, target)
       })    
       if TARGET_CACHE[i].mode == "return" then
         predicted_ret = ret[9]:float() --read_val
+        -- print(ret[2][1])
       end
     end
 
@@ -254,12 +255,12 @@ function fp(mode, state, target)
     model.err_wv[i] = ret[4][1]
     model.err_we[i] = ret[5][1]
     g_replace_table(model.s[i], ret[6])
-    model.MEM[i]:copy(ret[7]) 
-    model.read_key[i]:copy(ret[8])
-    model.read_val[i]:copy(ret[9])
-    model.write_key[i]:copy(ret[10])
-    model.write_val[i]:copy(ret[11])
-    model.write_erase[i]:copy(ret[12])
+    model.MEM[i]:copy(ret[7]:clone()) 
+    model.read_key[i]:copy(ret[8]:clone())
+    model.read_val[i]:copy(ret[9]:clone())
+    model.write_key[i]:copy(ret[10]:clone())
+    model.write_val[i]:copy(ret[11]:clone())
+    model.write_erase[i]:copy(ret[12]:clone())
   end
   -- g_replace_table(model.start_s, model.s[params.seq_length])
   return predicted_ret, target_ret, model.err_rk:mean() + model.err_rv:mean() + model.err_wk:mean() + model.err_wv:mean() + model.err_we:mean()
@@ -293,18 +294,21 @@ function bp(mode,state, target)
         derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.ones(1)); derr_we = transfer_data(torch.ones(1))
         rk = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
         rv = torch.zeros(params.batch_size, params.rows, params.cols):cuda()
-        wk = TARGET_CACHE[i].key:cuda()
-        wv = TARGET_CACHE[i].val:cuda()
-        we = TARGET_CACHE[i].write_erase_cache:cuda()--torch.zeros(params.batch_size, params.rows, params.cols):cuda()
+      
+        wk = TARGET_CACHE[i].key:clone(); wk = wk:cuda()
+        wv = TARGET_CACHE[i].val:clone(); wv = wv:cuda()
+        we = TARGET_CACHE[i].write_erase_cache:clone();we = we:cuda()
+
       else
         derr_rk = transfer_data(torch.ones(1)); 
         derr_wk = transfer_data(torch.ones(1)); derr_wv = transfer_data(torch.zeros(1)); derr_we = transfer_data(torch.zeros(1))
-        rk = TARGET_CACHE[i].key:cuda()
+        rk = TARGET_CACHE[i].key:clone(); rk = rk:cuda()
+        -- print(rk[1])
         if TARGET_CACHE[i].mode == "return" then
           -- rv = TARGET_CACHE[i].memory:cuda()
           local map = TARGET_CACHE[i].map
           rv = torch.zeros(params.batch_size, params.rows, params.cols)
-          rv[{{}, {map.from_row[1], map.from_row[2]}, {map.from_col[1], map.from_col[2]}}] = target
+          rv[{{}, {map.from_row[1], map.from_row[2]}, {map.from_col[1], map.from_col[2]}}] = target:clone()
           rv = rv:cuda()
           derr_rv = transfer_data(torch.ones(1)) --read output 
         else
@@ -327,8 +331,10 @@ function bp(mode,state, target)
       })  
 
       if TARGET_CACHE[i].mode == "return" then
-          print(model.read_key[i][1])
-          print(rk[1])
+          -- print(ret[3][1])
+          -- print(rk[1])
+          -- print(model.read_key[i][1])
+          -- print(rk[1])
       end 
     end
 
@@ -341,6 +347,7 @@ function bp(mode,state, target)
     model.ds_write_val:copy(ret[6])
     model.ds_write_erase:copy(ret[7])
 
+    -- print(model.ds_read_key[1])
     -- print('------------')
     -- for ii=1,7 do
     --   print(ret[ii][1]:sum())
@@ -348,12 +355,15 @@ function bp(mode,state, target)
 
     cutorch.synchronize()
   end
-  model.norm_dw = paramdx:norm()
-  if model.norm_dw > params.max_grad_norm then
-    local shrink_factor = params.max_grad_norm / model.norm_dw
-    paramdx:mul(shrink_factor)
+
+  if mode ~= "fake" then
+    model.norm_dw = paramdx:norm()
+    if model.norm_dw > params.max_grad_norm then
+      local shrink_factor = params.max_grad_norm / model.norm_dw
+      paramdx:mul(shrink_factor)
+    end
+    paramx:add(paramdx:mul(-params.lr))
   end
-  paramx:add(paramdx:mul(-params.lr))
 end
 
 
